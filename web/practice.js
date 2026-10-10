@@ -5,10 +5,12 @@ export function practiceView(renderResult) {
   const root = document.querySelector('#flip-view');
   root.innerHTML = `<div class="intro flip-intro"><p class="eyebrow"><span aria-hidden="true"></span>See the difference, one switch at a time</p><h1 id="flip-title">Same server.<br><span class="muted-title">A different lock.</span></h1><p class="intro-description">The practice server is ours, and this switch really changes how it agrees on keys.</p><p id="practice-mock" ${api.mock ? '' : 'hidden'}>In this mock demo, the switch alternates sample results instead of restarting a server.</p></div>
     <div class="flip-controls"><div><p class="control-caption">Practice server key exchange</p><div class="mode-labels"><span data-mode="classical">Old lock</span><span class="mode-track" aria-hidden="true"><i></i></span><span data-mode="hybrid">New lock</span></div></div><button id="flip-button" class="primary" type="button" role="switch" aria-label="New lock" aria-checked="false" disabled>Load practice server</button></div>
+    <p class="reset-row"><button id="reset-button" class="secondary" type="button">Reset to the old lock</button><span class="hint">Press this before you show someone the demo, so it starts from the old lock.</span></p>
     <div id="flip-status" class="status" role="status" aria-live="polite"></div><div id="comparison" class="compare single"></div>`;
   const status = root.querySelector('#flip-status');
   const button = root.querySelector('#flip-button');
   const comparison = root.querySelector('#comparison');
+  const reset = root.querySelector('#reset-button');
   let mode = null;
   let current = null;
   let busy = false;
@@ -54,7 +56,8 @@ export function practiceView(renderResult) {
       updateMode();
       show(null, current);
       initialized = true;
-      status.textContent = `Current connection: ${label(current)}, ${current.verdict.score} out of 100.`;
+      status.textContent = `Current connection: ${label(current)}, ${current.verdict.score} out of 100.`
+        + (mode === 'hybrid' ? ' It is on the new lock. Use Reset to start from the old lock.' : '');
     } catch (error) { recover(error, load); }
     finally { busy = false; button.disabled = !initialized; }
   }
@@ -81,6 +84,28 @@ export function practiceView(renderResult) {
       initialized = false;
     } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus({preventScroll: true}); }
   }
+  async function resetDemo() {
+    if (busy) return;
+    busy = true; button.disabled = true; reset.disabled = true;
+    status.innerHTML = loading(api.mock ? 'Resetting the mock practice result' : 'Resetting the practice server');
+    try {
+      const state = await api.setPracticeMode('classical');
+      mode = state.mode; updateMode();
+      status.innerHTML = loading();
+      current = await api.scan('practice');
+      show(null, current);
+      initialized = true;
+      status.textContent = `Reset: ${label(current)}, ${current.verdict.score} out of 100. Ready to flip.`;
+    } catch (error) {
+      comparison.replaceChildren();
+      recover(error, load);
+      initialized = false;
+    } finally {
+      busy = false; button.disabled = !initialized; reset.disabled = false;
+      if (initialized) button.focus({preventScroll: true});
+    }
+  }
+  reset.addEventListener('click', resetDemo);
   button.addEventListener('click', flip);
   // Clicking a label picks that mode; clicking the track flips it.
   root.querySelectorAll('[data-mode]').forEach(el =>

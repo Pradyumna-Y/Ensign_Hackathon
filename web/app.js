@@ -59,6 +59,10 @@ async function runScan() {
   $('#host').value = host;
   try {
     lastResult = await api.scan(host, $('#data').value, $('#years').value);
+    // Keep the address bar in step, so the link can be shared to repeat this scan.
+    const link = new URLSearchParams({host, data: $('#data').value, years: $('#years').value});
+    if (api.mock) link.set('mock', '1');
+    history.replaceState(null, '', `?${link}${location.hash}`);
     renderResult($('#scan-result'), lastResult);
     focusScanResult();
     $('#scan-status').textContent = `${host}: ${label(lastResult)}, ${lastResult.verdict.score} out of 100. ${source(lastResult)}.`;
@@ -108,3 +112,18 @@ document.querySelector('.skip').addEventListener('click', event => {
 });
 window.addEventListener('hashchange', route);
 route(); loadExamples();
+
+// A link like /?host=github.com&data=bank_records&years=25 runs that scan on arrival.
+(function scanFromLink() {
+  const params = new URLSearchParams(location.search);
+  const host = params.get('host');
+  if (!host || location.hash === '#flip') return;
+  $('#host').value = api.normalizeHost(host);
+  if (defaults[params.get('data')] !== undefined) {
+    $('#data').value = params.get('data');
+    $('#years').value = defaults[params.get('data')];
+  }
+  const years = params.get('years');
+  if (years !== null && /^\d{1,3}$/.test(years)) $('#years').value = years;
+  runScan();
+})();

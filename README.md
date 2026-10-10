@@ -17,6 +17,26 @@ shows the verdict change.
 
 Built for Ensign BUILD, Technical Solution category.
 
+## Try it in 60 seconds
+
+On macOS or Linux, from this folder:
+
+```
+./scripts/run.sh
+```
+
+It finds an OpenSSL 3.5 or later, sets itself up the first time, and opens
+the page. Then:
+
+1. Type any site (or click an example) and press Scan.
+2. Open "Flip the lock" and press the switch. A real server restarts with the
+   new key exchange and the page rescans.
+3. Press "Reset to the old lock" to start the demo again.
+
+The address bar follows your scan, so a link like
+`/?host=github.com&data=bank_records&years=25` repeats it. Docker and Windows
+steps are under "Running it" below.
+
 ## What we check (honest scope)
 
 - We check one thing: how the connection agrees on its secret key, plus the
@@ -132,6 +152,7 @@ start the OpenSSL processes.
 | `python -m server.scan a.com b.com` | Scan several sites and print a table |
 | `python scripts/seed_cache.py` | Save fresh results for the demo sites (run on demo morning) |
 | `python scripts/prove_flip.py` | Flip the practice server both ways against a running API |
+| `./scripts/run.sh` | Start everything on macOS or Linux (finds OpenSSL, sets up, opens the page) |
 | `python scripts/check_demo.py` | Seven pass/fail checks against a running app; run it before a demo |
 | `python -m pytest` | Run the tests |
 
