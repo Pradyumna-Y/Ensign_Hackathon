@@ -20,9 +20,17 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
 from server.errors import ScanError
 
-# What our TLS 1.3 probe offers, in order of preference. secp384r1 is there so
-# a server that only does P-384 is not wrongly reported as "no TLS 1.3".
-OFFERED_GROUPS = ["X25519MLKEM768", "X25519", "secp256r1", "secp384r1"]
+# What our TLS 1.3 probe offers, in order of preference. The extra hybrid
+# groups and secp384r1 are there so a server that only supports one of them is
+# not wrongly reported as "no TLS 1.3" or "classical".
+OFFERED_GROUPS = ["X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024",
+                  "X25519", "secp256r1", "secp384r1"]
+# Used for one retry if the first TLS 1.3 attempt failed: a short ClientHello
+# with no large ML-KEM key share, in case something in the path dislikes it.
+FALLBACK_GROUPS = ["X25519", "secp256r1", "secp384r1"]
+# Groups that combine ML-KEM with a classical exchange. Pure ML-KEM groups are
+# deliberately not listed.
+HYBRID_GROUPS = {"x25519mlkem768", "secp256r1mlkem768", "secp384r1mlkem1024"}
 
 PROBE_TIMEOUT = 8          # seconds per openssl run
 MAX_OUTPUT = 256 * 1024    # bytes; a normal handshake prints about 15 KB
@@ -110,17 +118,20 @@ async def run_s_client(openssl, ip, host, port, version_flag, groups=None):
         stderr=asyncio.subprocess.STDOUT,
     )
     try:
-        data, too_large = await asyncio.wait_for(
-            _read_capped(proc.stdout, MAX_OUTPUT), PROBE_TIMEOUT)
-        timed_out = False
-    except asyncio.TimeoutError:
-        data, too_large, timed_out = b"", False, True
-    if proc.returncode is None:
         try:
-            proc.kill()
-        except ProcessLookupError:
-            pass
-    await proc.wait()
+            data, too_large = await asyncio.wait_for(
+                _read_capped(proc.stdout, MAX_OUTPUT), PROBE_TIMEOUT)
+            timed_out = False
+        except asyncio.TimeoutError:
+            data, too_large, timed_out = b"", False, True
+    finally:
+        # Also runs when the scan is cancelled, so no openssl process is left behind.
+        if proc.returncode is None:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+        await proc.wait()
     return RawProbe(data.decode("utf-8", "replace"), timed_out, too_large)
 
 
@@ -139,6 +150,10 @@ class Probe:
 
 
 NEW_LINE = re.compile(r"^New, (\S+), Cipher is (\S+)", re.M)
+# The "New," line shows the first protocol version that defined the cipher, not
+# the version that was negotiated (a TLS 1.2 handshake with a CBC suite says
+# TLSv1.0 there), so the negotiated version comes from this line.
+PROTOCOL = re.compile(r"^Protocol\s*:\s*(\S+)", re.M)
 NEGOTIATED = re.compile(r"^Negotiated TLS1\.3 group: (\S+)", re.M)
 TEMP_KEY = re.compile(r"^(?:Peer|Server) Temp Key: (.+)$", re.M)
 PEM_BLOCK = re.compile(
@@ -170,6 +185,9 @@ def parse_s_client(raw):
     m = NEW_LINE.search(text)
     if m and m[1] != "(NONE)" and m[2] != "(NONE)":
         protocol, cipher = m[1], m[2]
+        negotiated = PROTOCOL.search(text)
+        if negotiated:
+            protocol = negotiated[1]
 
     # OpenSSL 3.5 prints "Negotiated TLS1.3 group" for hybrid groups and
     # "Peer Temp Key" for classical ones, so we read both.
@@ -220,8 +238,13 @@ def tls12_key_exchange(cipher):
 def classify(tls13, tls12):
     if tls13.ok:
         # TLS 1.3 always uses an ephemeral key exchange; the question is which group.
-        if tls13.group and "MLKEM" in tls13.group.upper():
+        if not tls13.group:
+            return "unknown"   # never guess "classical" when the group was not read
+        name = tls13.group.lower()
+        if name in HYBRID_GROUPS:
             return "hybrid_pq"
+        if "mlkem" in name:
+            return "unknown"   # a pure ML-KEM group is neither hybrid nor classical
         return "classical"
     if tls12.ok:
         return tls12_key_exchange(tls12.cipher)
@@ -237,9 +260,9 @@ def parse_certificate(pem):
         return None
     try:
         cert = x509.load_pem_x509_certificate(pem.encode())
-    except ValueError:
+        key = cert.public_key()
+    except Exception:   # unreadable or unsupported certificate: show no details
         return None
-    key = cert.public_key()
     if isinstance(key, rsa.RSAPublicKey):
         key_type, bits = "RSA", key.key_size
     elif isinstance(key, ec.EllipticCurvePublicKey):
@@ -264,6 +287,13 @@ def parse_certificate(pem):
 # One full site probe
 # ---------------------------------------------------------------------------
 
+RETRY_FAILURES = ("timeout", "connect_failed", "handshake_refused")
+
+
+async def _nothing():
+    return None
+
+
 async def probe_site(openssl, host, ip, port=443):
     """Run both probes (2 connections total) and build the handshake section.
 
@@ -274,6 +304,23 @@ async def probe_site(openssl, host, ip, port=443):
         run_s_client(openssl, ip, host, port, "-tls1_2"),
     )
     tls13, tls12 = parse_s_client(raw13), parse_s_client(raw12)
+
+    # A failed attempt is not proof that the site lacks that protocol: a dropped
+    # packet or a middlebox that dislikes our large ClientHello looks the same.
+    # Try once more before drawing a conclusion.
+    retry13 = not tls13.ok and tls13.failure in RETRY_FAILURES
+    retry12 = not tls12.ok and tls12.failure in ("timeout", "connect_failed")
+    if retry13 or retry12:
+        again13, again12 = await asyncio.gather(
+            run_s_client(openssl, ip, host, port, "-tls1_3", FALLBACK_GROUPS)
+            if retry13 else _nothing(),
+            run_s_client(openssl, ip, host, port, "-tls1_2")
+            if retry12 else _nothing(),
+        )
+        if retry13 and parse_s_client(again13).ok:
+            tls13 = parse_s_client(again13)
+        if retry12 and parse_s_client(again12).ok:
+            tls12 = parse_s_client(again12)
 
     if not tls13.ok and not tls12.ok:
         if tls13.failure == "timeout" and tls12.failure == "timeout":
@@ -321,12 +368,13 @@ async def hybrid_self_test(openssl):
         raise SystemExit(
             f"{openssl} cannot offer X25519MLKEM768. Use OpenSSL 3.5 or later.")
     try:
-        infos = await asyncio.get_running_loop().getaddrinfo(
-            SELF_TEST_HOST, 443, type=socket.SOCK_STREAM)
+        infos = await asyncio.wait_for(
+            asyncio.get_running_loop().getaddrinfo(
+                SELF_TEST_HOST, 443, type=socket.SOCK_STREAM), 5)
         ip = infos[0][4][0]
         raw = await run_s_client(openssl, ip, SELF_TEST_HOST, 443,
                                  "-tls1_3", ["X25519MLKEM768"])
-    except OSError:
-        return False
+    except (OSError, asyncio.TimeoutError, IndexError):
+        return False   # no internet or filtered DNS: start anyway
     probe = parse_s_client(raw)
     return probe.ok and probe.group == "X25519MLKEM768"
