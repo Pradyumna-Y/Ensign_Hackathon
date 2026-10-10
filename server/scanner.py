@@ -1,0 +1,339 @@
+"""Scanner core: two OpenSSL handshakes against one site, then read the result.
+
+We drive the openssl command line (3.5 or later) because it is the first
+release that can offer the hybrid post-quantum group X25519MLKEM768.
+Probe 1 asks for TLS 1.3 and offers the new group first. Probe 2 asks for
+TLS 1.2 only, to see whether old clients are still accepted and which key
+exchange they get.
+"""
+
+import asyncio
+import os
+import re
+import shutil
+import socket
+import subprocess
+from dataclasses import dataclass
+
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+
+# What our TLS 1.3 probe offers, in order of preference. secp384r1 is there so
+# a server that only does P-384 is not wrongly reported as "no TLS 1.3".
+OFFERED_GROUPS = ["X25519MLKEM768", "X25519", "secp256r1", "secp384r1"]
+
+PROBE_TIMEOUT = 8          # seconds per openssl run
+MAX_OUTPUT = 256 * 1024    # bytes; a normal handshake prints about 15 KB
+
+# Places Git for Windows puts its OpenSSL, used when "openssl" on PATH is too old.
+WINDOWS_CANDIDATES = [
+    r"C:\Program Files\Git\mingw64\bin\openssl.exe",
+    r"C:\Program Files\Git\usr\bin\openssl.exe",
+]
+
+
+class ScanError(Exception):
+    """A scan failed in a way we can explain. `code` is one of the contract codes."""
+
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+# ---------------------------------------------------------------------------
+# Finding OpenSSL
+# ---------------------------------------------------------------------------
+
+def openssl_version(binary):
+    """Return (major, minor, patch, text) for an openssl binary, or None."""
+    try:
+        out = subprocess.run([binary, "version"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.match(r"OpenSSL (\d+)\.(\d+)\.(\d+)", out)
+    if not m:
+        return None
+    return int(m[1]), int(m[2]), int(m[3]), out.split()[1]
+
+
+def find_openssl():
+    """Pick the first OpenSSL that is 3.5 or later. OPENSSL_BIN overrides."""
+    candidates = [os.environ.get("OPENSSL_BIN"), shutil.which("openssl"),
+                  *WINDOWS_CANDIDATES]
+    for binary in candidates:
+        if not binary:
+            continue
+        version = openssl_version(binary)
+        if version and version[:2] >= (3, 5):
+            return binary, version[3]
+    raise SystemExit(
+        "No OpenSSL 3.5 or later found. It is needed to offer X25519MLKEM768. "
+        "Install Git for Windows, use the Docker image, or set OPENSSL_BIN."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Running s_client
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RawProbe:
+    text: str
+    timed_out: bool = False
+    too_large: bool = False
+
+
+async def _read_capped(stream, limit):
+    chunks, total = [], 0
+    while True:
+        chunk = await stream.read(65536)
+        if not chunk:
+            return b"".join(chunks), False
+        total += len(chunk)
+        if total > limit:
+            return b"".join(chunks), True
+        chunks.append(chunk)
+
+
+async def run_s_client(openssl, ip, host, port, version_flag, groups=None):
+    """Run one `openssl s_client` handshake and return its text output.
+
+    We connect to the IP we resolved ourselves and pass the hostname only as
+    SNI (-servername). Arguments are a list, never a shell string, so a
+    hostname can never be interpreted as a command.
+    """
+    target = f"[{ip}]:{port}" if ":" in ip else f"{ip}:{port}"
+    args = [openssl, "s_client", "-connect", target, "-servername", host,
+            version_flag, "-showcerts"]
+    if groups:
+        args += ["-groups", ":".join(groups)]
+
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.DEVNULL,   # closed stdin: s_client quits after the handshake
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    try:
+        data, too_large = await asyncio.wait_for(
+            _read_capped(proc.stdout, MAX_OUTPUT), PROBE_TIMEOUT)
+        timed_out = False
+    except asyncio.TimeoutError:
+        data, too_large, timed_out = b"", False, True
+    if proc.returncode is None:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+    await proc.wait()
+    return RawProbe(data.decode("utf-8", "replace"), timed_out, too_large)
+
+
+# ---------------------------------------------------------------------------
+# Parsing s_client output
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Probe:
+    ok: bool                  # handshake completed
+    protocol: str | None      # "TLSv1.3", "TLSv1.2"
+    cipher: str | None        # e.g. "TLS_AES_128_GCM_SHA256" or "ECDHE-RSA-AES128-GCM-SHA256"
+    group: str | None         # key exchange group the server picked, e.g. "X25519MLKEM768"
+    cert_pem: str | None      # the server's own (leaf) certificate
+    failure: str | None       # why it failed: timeout, connect_failed, not_tls, handshake_refused
+
+
+NEW_LINE = re.compile(r"^New, (\S+), Cipher is (\S+)", re.M)
+NEGOTIATED = re.compile(r"^Negotiated TLS1\.3 group: (\S+)", re.M)
+TEMP_KEY = re.compile(r"^(?:Peer|Server) Temp Key: (.+)$", re.M)
+PEM_BLOCK = re.compile(
+    r"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", re.S)
+
+# OpenSSL calls P-256 "prime256v1"; the TLS name is secp256r1.
+CURVE_NAMES = {"prime256v1": "secp256r1", "x25519": "X25519", "x448": "X448"}
+
+
+def _group_from_temp_key(value):
+    """'X25519, 253 bits' -> X25519, 'ECDH, prime256v1, 256 bits' -> secp256r1."""
+    parts = [p.strip() for p in value.split(",")]
+    if parts[0] == "ECDH" and len(parts) > 1:
+        name = parts[1]
+    elif parts[0] == "DH":
+        name = "DH"   # finite-field Diffie-Hellman, still classical
+    else:
+        name = parts[0]
+    return CURVE_NAMES.get(name, name)
+
+
+def parse_s_client(raw):
+    """Turn s_client text into a Probe. Works on saved samples too (see tests)."""
+    if raw.timed_out:
+        return Probe(False, None, None, None, None, "timeout")
+    text = raw.text.replace("\r\n", "\n")
+
+    protocol = cipher = group = None
+    m = NEW_LINE.search(text)
+    if m and m[1] != "(NONE)" and m[2] != "(NONE)":
+        protocol, cipher = m[1], m[2]
+
+    # OpenSSL 3.5 prints "Negotiated TLS1.3 group" for hybrid groups and
+    # "Peer Temp Key" for classical ones, so we read both.
+    m = NEGOTIATED.search(text)
+    if m and m[1] != "<NULL>":
+        group = m[1]
+    else:
+        m = TEMP_KEY.search(text)
+        if m:
+            group = _group_from_temp_key(m[1])
+
+    pem = PEM_BLOCK.search(text)
+    ok = protocol is not None and not raw.too_large
+
+    failure = None
+    if not ok:
+        if raw.too_large:
+            failure = "not_tls"
+        elif "CONNECTED(" not in text or "connect:errno" in text:
+            failure = "connect_failed"
+        elif "packet length too long" in text or "wrong version number" in text:
+            failure = "not_tls"   # something answered, but it does not speak TLS
+        else:
+            failure = "handshake_refused"
+    return Probe(ok, protocol, cipher, group if ok else None,
+                 pem[0] if (ok and pem) else None, failure)
+
+
+# ---------------------------------------------------------------------------
+# Classification
+# ---------------------------------------------------------------------------
+
+def tls12_key_exchange(cipher):
+    """Read the key exchange from an OpenSSL TLS 1.2 cipher suite name.
+
+    ECDHE-/DHE- suites make a fresh key per connection (ephemeral). Suites that
+    start straight with the bulk cipher (AES128-SHA, AES256-GCM-SHA384, ...)
+    use RSA key exchange: the browser encrypts the secret to the server's
+    long-term RSA key.
+    """
+    if cipher.startswith(("ECDHE-", "DHE-", "EDH-")):
+        return "classical"
+    if cipher.startswith(("AES", "CAMELLIA", "DES-", "RC4", "SEED", "IDEA", "ARIA")):
+        return "static_rsa"
+    return "unknown"
+
+
+def classify(tls13, tls12):
+    if tls13.ok:
+        # TLS 1.3 always uses an ephemeral key exchange; the question is which group.
+        if tls13.group and "MLKEM" in tls13.group.upper():
+            return "hybrid_pq"
+        return "classical"
+    if tls12.ok:
+        return tls12_key_exchange(tls12.cipher)
+    return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Certificate (shown for context, never scored)
+# ---------------------------------------------------------------------------
+
+def parse_certificate(pem):
+    if not pem:
+        return None
+    try:
+        cert = x509.load_pem_x509_certificate(pem.encode())
+    except ValueError:
+        return None
+    key = cert.public_key()
+    if isinstance(key, rsa.RSAPublicKey):
+        key_type, bits = "RSA", key.key_size
+    elif isinstance(key, ec.EllipticCurvePublicKey):
+        key_type, bits = "ECDSA", key.curve.key_size
+    elif isinstance(key, ed25519.Ed25519PublicKey):
+        key_type, bits = "Ed25519", 256
+    elif isinstance(key, ed448.Ed448PublicKey):
+        key_type, bits = "Ed448", 456
+    else:
+        key_type, bits = type(key).__name__, None
+    oid = cert.signature_algorithm_oid
+    return {
+        "keyType": key_type,
+        "keyBits": bits,
+        "signature": getattr(oid, "_name", oid.dotted_string),
+        "expires": cert.not_valid_after_utc.date().isoformat(),
+        "note": "Shown for context. Not scored.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# One full site probe
+# ---------------------------------------------------------------------------
+
+async def probe_site(openssl, host, ip, port=443):
+    """Run both probes (2 connections total) and build the handshake section.
+
+    Returns {"handshake": {...}, "certificate": {...}} or raises ScanError.
+    """
+    raw13, raw12 = await asyncio.gather(
+        run_s_client(openssl, ip, host, port, "-tls1_3", OFFERED_GROUPS),
+        run_s_client(openssl, ip, host, port, "-tls1_2"),
+    )
+    tls13, tls12 = parse_s_client(raw13), parse_s_client(raw12)
+
+    if not tls13.ok and not tls12.ok:
+        if tls13.failure == "timeout" and tls12.failure == "timeout":
+            raise ScanError("timeout", "The site did not answer in time. Try again in a moment.")
+        raise ScanError("no_tls", "This site did not complete a TLS 1.2 or 1.3 handshake on port 443.")
+
+    main = tls13 if tls13.ok else tls12
+    return {
+        "handshake": {
+            "tlsVersion": main.protocol,
+            "cipherSuite": main.cipher,
+            "weOffered": list(OFFERED_GROUPS),
+            "serverPicked": main.group,
+            "keyExchange": classify(tls13, tls12),
+            "supportsTls13": tls13.ok,
+            "acceptsTls12": tls12.ok,
+        },
+        "certificate": parse_certificate(main.cert_pem),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Startup self-test
+# ---------------------------------------------------------------------------
+
+SELF_TEST_HOST = "cloudflare.com"
+
+
+def local_supports_hybrid(openssl):
+    """True if this OpenSSL lists X25519MLKEM768 as a TLS 1.3 group."""
+    out = subprocess.run([openssl, "list", "-tls-groups", "-tls1_3"],
+                         capture_output=True, text=True, timeout=5).stdout
+    return "X25519MLKEM768" in out.split(":")
+
+
+async def hybrid_self_test(openssl):
+    """Make sure we can really offer the hybrid group, so we never report
+    "classical" because of our own tooling.
+
+    Exits if the local OpenSSL cannot offer it. Returns True if a known
+    hybrid site actually agreed to it, False if we could not reach it
+    (for example no internet), in which case scans still run.
+    """
+    if not local_supports_hybrid(openssl):
+        raise SystemExit(
+            f"{openssl} cannot offer X25519MLKEM768. Use OpenSSL 3.5 or later.")
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(
+            SELF_TEST_HOST, 443, type=socket.SOCK_STREAM)
+        ip = infos[0][4][0]
+        raw = await run_s_client(openssl, ip, SELF_TEST_HOST, 443,
+                                 "-tls1_3", ["X25519MLKEM768"])
+    except OSError:
+        return False
+    probe = parse_s_client(raw)
+    return probe.ok and probe.group == "X25519MLKEM768"

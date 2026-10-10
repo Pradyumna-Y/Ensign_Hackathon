@@ -69,7 +69,7 @@ Returns a ScanResult:
   "handshake": {
     "tlsVersion": "TLSv1.3",
     "cipherSuite": "TLS_AES_256_GCM_SHA384",
-    "weOffered": ["X25519MLKEM768", "X25519", "secp256r1"],
+    "weOffered": ["X25519MLKEM768", "X25519", "secp256r1", "secp384r1"],
     "serverPicked": "X25519MLKEM768",
     "keyExchange": "hybrid_pq",
     "supportsTls13": true,
