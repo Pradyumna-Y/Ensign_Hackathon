@@ -1,6 +1,7 @@
 import * as api from './api.js';
 import {escape, verdictView, source, label, errorView, loading} from './views.js';
 import {practiceView} from './practice.js';
+import {timelineView} from './timeline.js';
 
 const $ = selector => document.querySelector(selector);
 const defaults = {health_records: 30, bank_records: 25, government_docs: 50, login_session: 0};
@@ -10,6 +11,7 @@ $('#mock-banner').hidden = !api.mock;
 
 function renderResult(target, result) {
   target.innerHTML = verdictView(result);
+  target.querySelector('.timeline-slot').innerHTML = timelineView(result);
 }
 const flipPanel = practiceView(renderResult);
 
