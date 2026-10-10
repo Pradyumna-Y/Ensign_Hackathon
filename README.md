@@ -208,7 +208,7 @@ Otherwise the key exchange would be the platform's, not ours.
 |---|---|---|
 | `server/` | Person A | Scanner, scoring, API, saved results |
 | `practice/` | Person A | Practice TLS server and mode switch |
-| `scripts/` | Person A | Seeding, sample capture, flip proof |
+| `scripts/` | Person A | Start script, pre-demo check, seeding, sample capture, flip proof |
 | `web/` | Person B | Frontend (plain HTML, CSS, JavaScript) |
 | `CONTRACT.md` | Shared | API and wording both sides follow |
 | `LEARNED.md` | Shared | What each of us learned, with times |

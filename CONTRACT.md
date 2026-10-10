@@ -143,7 +143,7 @@ Returns `{ "ok": true, "opensslVersion": "3.5.x", "hybridSelfTest": true }`.
 
 ### Limits the frontend must respect
 
-- At most 4 scans in flight at once.
+- At most 6 scans run at once across all visitors, and 3 per visitor. The practice server has its own, larger limit.
 - HTTP 429 means wait a few seconds and retry; show a friendly message.
 
 ## Demo script (both of us build toward this)
