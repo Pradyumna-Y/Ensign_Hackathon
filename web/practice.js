@@ -74,7 +74,7 @@ export function practiceView(renderResult) {
       comparison.replaceChildren();   // never leave an old result beside an error
       recover(error, load);
       initialized = false;
-    } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus(); }
+    } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus({preventScroll: true}); }
   }
   button.addEventListener('click', flip);
   root.querySelector('.mode-labels').addEventListener('click', flip);
