@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0F1B2D">
+  <title>Flip the Lock | Quantum readiness checker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar"><a class="brand" href="#scan"><span aria-hidden="true">◈</span> Flip the Lock</a><nav aria-label="Main"><a href="#scan">Check a site</a><a href="#flip">Flip the lock</a></nav></header>
+  <div id="mock-banner" class="banner" hidden>Mock demo: these are sample results, not real scans.</div>
+  <main id="main" tabindex="-1">
+    <section id="scan-view" aria-labelledby="scan-title">
+      <div class="intro"><p class="eyebrow">Recorded today. Read years later?</p><h1 id="scan-title">Will your connection<br>outlast the quantum era?</h1><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p></div>
+      <form id="scan-form" class="scan-form">
+        <div class="host-field"><label for="host">Website address</label><input id="host" name="host" type="text" placeholder="cloudflare.com" required autocapitalize="none" spellcheck="false" autocomplete="url"><p class="hint">Paste a website address. We only send its hostname.</p></div>
+        <div class="choices"><div><label for="data">What needs to stay secret?</label><select id="data" name="data"><option value="health_records">Health records</option><option value="bank_records">Bank records</option><option value="government_docs">Government documents</option><option value="login_session">Login session</option></select></div><div><label for="years">For how many years?</label><input id="years" name="years" type="number" min="0" max="100" step="1" value="30" required></div><button id="scan-button" class="primary" type="submit">Scan this site <span aria-hidden="true">↗</span></button></div>
+        <div class="examples"><span>Try a site</span><div id="demo-sites"></div></div>
+      </form>
+      <div id="scan-status" class="status" role="status" aria-live="polite"></div>
+      <div id="scan-result"></div>
+      <div id="saved-results"></div>
+      <p id="empty-note" class="empty-note">Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p>
+    </section>
+    <section id="flip-view" hidden aria-labelledby="flip-title"></section>
+  </main>
+  <footer>We cannot see databases, passwords, or anything behind the connection.<br>The year quantum computers arrive is an assumption. Estimates vary.</footer>
+</body>
+</html>

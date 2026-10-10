@@ -1,0 +1,44 @@
+// API strings are escaped before entering markup, including hostnames and fixes.
+export function escape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+}
+export const label = result => result.verdict.label === 'ready' ? 'Ready' : 'Not ready yet';
+export const source = result => result.source === 'cached'
+  ? `Saved result from ${new Date(result.scannedAt).toLocaleString()}` : 'Live scan';
+function chip(group, picked = false) {
+  const method = /MLKEM|ML-KEM/i.test(group) ? 'new method' : 'old method';
+  return `<span class="protocol ${picked ? 'picked' : ''}"><code>${escape(group)}</code><small>${method}</small></span>`;
+}
+export function verdictView(result) {
+  const {handshake: h, verdict: v, certificate: c} = result;
+  const ready = v.label === 'ready';
+  return `<article class="result ${ready ? 'ready' : ''}" aria-label="${escape(result.host)} result">
+    <div class="result-meta"><span class="host">${escape(result.host)}</span><span class="badge">${escape(source(result))}</span></div>
+    <h2 class="verdict-label"><span aria-hidden="true">${ready ? '✓' : '!'}</span> ${label(result)}</h2>
+    <p class="headline">${escape(v.headline)}</p><p class="reason">${escape(v.reason)}</p>
+    <div class="meter-label"><span>Connection readiness</span><strong>${escape(v.score)} / 100</strong></div>
+    <div class="meter" role="meter" aria-label="Connection readiness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(v.score)}" style="--score:${Number(v.score)}%"><div class="meter-fill"></div><span class="threshold" aria-hidden="true"></span></div>
+    <p class="meter-caption">Ready at 80 · Score checks key exchange and TLS only</p>
+    <div class="handshake"><div><p>Your browser offered</p><div class="protocols">${h.weOffered.map(g => chip(g)).join('')}</div></div><span aria-hidden="true">→</span><div><p>The site picked</p><div class="protocols">${h.serverPicked ? chip(h.serverPicked, true) : `<span class="protocol picked">No named group<small>${h.keyExchange === 'static_rsa' ? 'old method: RSA key exchange' : 'method not identified'}</small></span>`}</div></div></div>
+    <p class="tls"><code>${escape(h.tlsVersion)}</code> · ${h.acceptsTls12 ? 'TLS 1.2 also accepted' : 'TLS 1.2 not accepted'}</p>
+    <div class="timeline-slot"></div>
+    ${v.fixes.length ? `<section class="fixes"><h3>What to change</h3><ul>${v.fixes.map(f => `<li><strong>${escape(f.title)}</strong><p>${escape(f.detail)}</p></li>`).join('')}</ul></section>` : ''}
+    <details class="notes"><summary>Notes: what this does not tell you</summary><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p><p>Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p><p>We cannot see databases, passwords, or anything behind the connection.</p><h3>Certificate (not scored)</h3>${c ? `<dl><dt>Key</dt><dd><code>${escape(c.keyType)} ${escape(c.keyBits)}</code></dd><dt>Signature</dt><dd><code>${escape(c.signature)}</code></dd><dt>Expires</dt><dd>${escape(c.expires)}</dd></dl>` : '<p>No certificate details returned.</p>'}<p>Certificates are shown for context but not scored. They matter for impersonation later, not for recorded traffic.</p><p>The year quantum computers arrive is an assumption. We use ${escape(result.shelfLife.quantumArrivalYear)} and say so on screen. Estimates vary.</p></details>
+  </article>`;
+}
+
+const errors = {
+  invalid_host: 'Enter a public hostname such as github.com. IP addresses and ports are not supported.',
+  invalid_input: 'Choose a data type and a whole number of years from 0 to 100.',
+  blocked_target: 'This address is not a public scan target. Choose a public website.',
+  dns_failed: 'We could not find that hostname. Check the spelling and try again.',
+  timeout: 'The site took too long to respond. Try again or scan another site.',
+  no_tls: 'The site did not answer with a TLS connection. Check the address or try another site.',
+  rate_limited: 'Too many requests. Wait a few seconds, then try again.',
+  internal: 'The scanner could not finish this request. Try again.',
+  unreachable: 'The scanner is not running or cannot be reached. Start the backend or choose a saved result below.'
+};
+export function errorView(error) {
+  return `<p>${escape(errors[error.code] || 'This request could not be completed. Try again.')}</p><button class="secondary" type="button" data-retry>Try again</button>`;
+}
+export function loading(text = 'Scanning') { return `<span class="spinner" aria-hidden="true"></span>${escape(text)}`; }

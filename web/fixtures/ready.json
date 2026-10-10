@@ -1,0 +1,49 @@
+{
+  "host": "cloudflare.com",
+  "scannedAt": "2026-10-10T07:12:03Z",
+  "source": "live",
+  "status": "ok",
+  "error": null,
+  "handshake": {
+    "tlsVersion": "TLSv1.3",
+    "cipherSuite": "TLS_AES_256_GCM_SHA384",
+    "weOffered": [
+      "X25519MLKEM768",
+      "X25519",
+      "secp256r1",
+      "secp384r1"
+    ],
+    "serverPicked": "X25519MLKEM768",
+    "keyExchange": "hybrid_pq",
+    "supportsTls13": true,
+    "acceptsTls12": true
+  },
+  "certificate": {
+    "keyType": "ECDSA",
+    "keyBits": 256,
+    "signature": "ecdsa-with-SHA256",
+    "expires": "2027-01-04",
+    "note": "Shown for context. Not scored."
+  },
+  "verdict": {
+    "label": "ready",
+    "score": 95,
+    "headline": "Recorded traffic to this site is protected against future quantum attacks.",
+    "reason": "The site agreed on its key using a hybrid post-quantum method.",
+    "harvestWindowOpen": false,
+    "fixes": [
+      {
+        "title": "Retire TLS 1.2 when old clients are gone.",
+        "detail": "Optional. Clients that only speak TLS 1.2 still get a classical key exchange."
+      }
+    ]
+  },
+  "shelfLife": {
+    "dataType": "health_records",
+    "years": 30,
+    "secretUntilYear": 2056,
+    "quantumArrivalYear": 2040,
+    "quantumArrivalIsAssumption": true,
+    "urgency": "none"
+  }
+}

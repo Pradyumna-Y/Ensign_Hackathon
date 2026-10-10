@@ -1,0 +1,49 @@
+{
+  "host": "practice",
+  "scannedAt": "2026-10-10T07:12:03Z",
+  "source": "live",
+  "status": "ok",
+  "error": null,
+  "handshake": {
+    "tlsVersion": "TLSv1.3",
+    "cipherSuite": "TLS_AES_256_GCM_SHA384",
+    "weOffered": [
+      "X25519MLKEM768",
+      "X25519",
+      "secp256r1",
+      "secp384r1"
+    ],
+    "serverPicked": "X25519",
+    "keyExchange": "classical",
+    "supportsTls13": true,
+    "acceptsTls12": false
+  },
+  "certificate": {
+    "keyType": "ECDSA",
+    "keyBits": 256,
+    "signature": "ecdsa-with-SHA256",
+    "expires": "2027-01-04",
+    "note": "Shown for context. Not scored."
+  },
+  "verdict": {
+    "label": "not_ready",
+    "score": 40,
+    "headline": "Recorded traffic to this site could be read once quantum computers arrive.",
+    "reason": "The site agreed on its key with X25519. Today's computers cannot break that, but a future quantum computer could.",
+    "harvestWindowOpen": true,
+    "fixes": [
+      {
+        "title": "Turn on hybrid post-quantum key exchange (X25519MLKEM768).",
+        "detail": "This is usually a library upgrade (OpenSSL 3.5 or later) or a setting in your hosting provider or CDN."
+      }
+    ]
+  },
+  "shelfLife": {
+    "dataType": "health_records",
+    "years": 30,
+    "secretUntilYear": 2056,
+    "quantumArrivalYear": 2040,
+    "quantumArrivalIsAssumption": true,
+    "urgency": "high"
+  }
+}
