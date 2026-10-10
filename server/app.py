@@ -14,10 +14,13 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from typing import Literal
 
+from practice.server import PracticeServer
 from server import scoring
-from server.errors import HTTP_STATUS, ScanError
+from server.errors import HTTP_STATUS, MESSAGES, ScanError
 from server.limits import RateLimiter, ScanSlots
 from server.results import error_result, ok_result
 from server.scanner import find_openssl, hybrid_self_test, probe_site
@@ -36,7 +39,14 @@ async def lifespan(app):
     app.state.hybrid_ok = await hybrid_self_test(app.state.openssl)
     log.warning("OpenSSL %s, hybrid self-test: %s",
                 app.state.openssl_version, app.state.hybrid_ok)
-    yield
+
+    # The practice server always starts on the old method.
+    app.state.practice = PracticeServer(app.state.openssl)
+    await app.state.practice.set_mode("classical")
+    try:
+        yield
+    finally:
+        await app.state.practice.close()
 
 
 app = FastAPI(title="Flip the Lock", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -113,6 +123,26 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
         scan_slots.release()
 
     return ok_result(target.host, probe, data, years_int)
+
+
+@app.get("/api/practice")
+async def practice_status(request: Request):
+    return {"mode": request.app.state.practice.mode, "scanHost": "practice"}
+
+
+class ModeRequest(BaseModel):
+    mode: Literal["classical", "hybrid"]
+
+
+@app.post("/api/practice/mode")
+async def practice_mode(body: ModeRequest, request: Request):
+    """Really stop and restart the practice server with the other group list."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.allow(client_ip):
+        return JSONResponse({"error": {"code": "rate_limited",
+                                       "message": MESSAGES["rate_limited"]}}, status_code=429)
+    mode = await request.app.state.practice.set_mode(body.mode)
+    return {"mode": mode}
 
 
 # Static frontend last, so /api/* routes win.

@@ -37,6 +37,18 @@ def client(monkeypatch):
             raise RuntimeError("C:\\secret\\path traceback")
         return HYBRID_PROBE
 
+    class FakePractice:
+        def __init__(self, openssl):
+            self.mode = None
+
+        async def set_mode(self, mode):
+            self.mode = mode
+            return mode
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(app_module, "PracticeServer", FakePractice)
     monkeypatch.setattr(app_module, "hybrid_self_test", self_test)
     monkeypatch.setattr(app_module, "resolve_target", resolve)
     monkeypatch.setattr(app_module, "probe_site", probe)
@@ -97,6 +109,14 @@ def test_unexpected_error_leaks_nothing(client):
     assert r.status_code == 500
     assert r.json()["error"]["code"] == "internal"
     assert "secret" not in r.text and "Traceback" not in r.text
+
+
+def test_practice_endpoints(client):
+    assert client.get("/api/practice").json() == {"mode": "classical", "scanHost": "practice"}
+    assert client.post("/api/practice/mode", json={"mode": "hybrid"}).json() == {"mode": "hybrid"}
+    assert client.get("/api/practice").json()["mode"] == "hybrid"
+    r = client.post("/api/practice/mode", json={"mode": "quantum"})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_input"
 
 
 def test_rate_limit(client):
