@@ -88,7 +88,12 @@ Returns a ScanResult:
     "headline": "Recorded traffic to this site is protected against future quantum attacks.",
     "reason": "The site agreed on its key using a hybrid post-quantum method.",
     "harvestWindowOpen": false,
-    "fixes": []
+    "fixes": [
+      {
+        "title": "Retire TLS 1.2 when old clients are gone.",
+        "detail": "Optional. Clients that only speak TLS 1.2 still get a classical key exchange."
+      }
+    ]
   },
   "shelfLife": {
     "dataType": "health_records",
