@@ -1,6 +1,6 @@
 """Quick pre-demo check against a running app. Prints PASS or FAIL for each step.
 
-    python scripts/smoke_test.py [http://127.0.0.1:8000]
+    python scripts/check_demo.py [http://127.0.0.1:8000]
 
 Needs the app running and internet for the first scan. The last step puts the
 practice server back on the old lock, ready for the demo. Exit code is 0 only

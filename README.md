@@ -131,7 +131,7 @@ start the OpenSSL processes.
 | `python -m server.scan a.com b.com` | Scan several sites and print a table |
 | `python scripts/seed_cache.py` | Save fresh results for the demo sites (run on demo morning) |
 | `python scripts/prove_flip.py` | Flip the practice server both ways against a running API |
-| `python scripts/smoke_test.py` | Seven pass/fail checks against a running app; run it before a demo |
+| `python scripts/check_demo.py` | Seven pass/fail checks against a running app; run it before a demo |
 | `python -m pytest` | Run the tests |
 
 The frontend alone, without the backend: open `web/index.html?mock=1`

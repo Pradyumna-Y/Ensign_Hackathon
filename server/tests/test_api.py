@@ -49,6 +49,10 @@ def client(monkeypatch, tmp_path):
             self.mode = None
             self.lock = asyncio.Lock()
 
+        @property
+        def running(self):
+            return self.mode is not None
+
         async def set_mode(self, mode):
             self.mode = mode
             return mode

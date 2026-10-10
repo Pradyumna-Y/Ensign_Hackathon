@@ -117,6 +117,11 @@ class PracticeServer:
         self.proc = None
         self.mode = None   # nothing is running, so do not report an old mode
 
+    @property
+    def running(self):
+        """True while our own s_server process is alive."""
+        return self.proc is not None and self.proc.returncode is None
+
     async def set_mode(self, mode):
         """Really restart s_server with the group list for `mode`."""
         if mode not in MODES:

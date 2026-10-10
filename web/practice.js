@@ -47,8 +47,9 @@ export function practiceView(renderResult) {
       mode = state.mode; updateMode();
       status.innerHTML = loading();
       current = await api.scan(state.scanHost);
-      mode = current.handshake.keyExchange === 'hybrid_pq' ? 'hybrid' : 'classical';
-      updateMode();   // trust the scan, not a status read taken during a restart
+      // The status read can be empty during a restart; then fall back to the scan.
+      mode = state.mode || (current.handshake.keyExchange === 'hybrid_pq' ? 'hybrid' : 'classical');
+      updateMode();
       show(null, current);
       initialized = true;
       status.textContent = `Current connection: ${label(current)}, ${current.verdict.score} out of 100.`;

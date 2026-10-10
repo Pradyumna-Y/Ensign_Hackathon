@@ -147,7 +147,7 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
 
         async def practice_scan():
             async with practice.lock:
-                if practice.mode is None:
+                if not practice.running:
                     raise ScanError("no_tls")   # our practice server is not running
                 return await probe_site(request.app.state.openssl, target.host,
                                         target.ip, target.port)

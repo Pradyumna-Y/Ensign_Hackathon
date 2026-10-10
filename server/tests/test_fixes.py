@@ -111,7 +111,10 @@ def valid_saved(host="cloudflare.com"):
             "handshake": {"keyExchange": "classical", "supportsTls13": True,
                           "acceptsTls12": False, "serverPicked": "X25519",
                           "weOffered": ["X25519"]},
-            "verdict": {"label": "not_ready", "score": 35}, "shelfLife": {"years": 30},
+            "verdict": {"label": "not_ready", "score": 35, "headline": "h", "reason": "r",
+                        "fixes": []},
+            "shelfLife": {"years": 30, "secretUntilYear": 2056, "quantumArrivalYear": 2040,
+                          "urgency": "high"},
             "certificate": None}
 
 
@@ -134,7 +137,8 @@ def test_cache_write_failure_does_not_raise(monkeypatch, tmp_path):
 
 def test_damaged_saved_values_are_ignored(monkeypatch, tmp_path):
     monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
-    for change in ({"scannedAt": "garbage"},
+    for change in ({"scannedAt": "garbage"}, {"scannedAt": "2026garbage"},
+                   {"verdict": {"label": "x", "score": 1, "headline": "h", "reason": "r"}},
                    {"handshake": {**valid_saved()["handshake"], "weOffered": None}},
                    {"verdict": {}}, {"shelfLife": {}}):
         (tmp_path / "cloudflare.com.json").write_text(
