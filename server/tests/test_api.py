@@ -4,9 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from server import app as app_module
+from server import cache
 from server.errors import ScanError
 from server.limits import RateLimiter
 from server.targets import Target
+
+OFFLINE = set()   # hosts whose live scan should time out in a test
 
 HYBRID_PROBE = {
     "handshake": {"tlsVersion": "TLSv1.3", "cipherSuite": "TLS_AES_256_GCM_SHA384",
@@ -19,7 +22,7 @@ HYBRID_PROBE = {
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     async def self_test(openssl):
         return True
 
@@ -33,6 +36,8 @@ def client(monkeypatch):
     async def probe(openssl, host, ip, port):
         if host == "notls.example":
             raise ScanError("no_tls")
+        if host in OFFLINE:
+            raise ScanError("timeout")
         if host == "boom.example":
             raise RuntimeError("C:\\secret\\path traceback")
         return HYBRID_PROBE
@@ -48,6 +53,7 @@ def client(monkeypatch):
         async def close(self):
             pass
 
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)   # never touch the real cache/
     monkeypatch.setattr(app_module, "PracticeServer", FakePractice)
     monkeypatch.setattr(app_module, "hybrid_self_test", self_test)
     monkeypatch.setattr(app_module, "resolve_target", resolve)
@@ -124,3 +130,40 @@ def test_rate_limit(client):
              for _ in range(31)]
     assert codes[:30] == [200] * 30
     assert codes[30] == 429
+
+
+def test_demo_sites(client):
+    sites = client.get("/api/demo-sites").json()["sites"]
+    assert "cloudflare.com" in sites and len(sites) >= 5
+
+
+def test_live_demo_scan_is_saved_and_listed_as_cached(client):
+    assert client.get("/api/cached").json() == []
+    client.get("/api/scan", params={"host": "cloudflare.com"})
+    client.get("/api/scan", params={"host": "not-a-demo-site.example"})
+    saved = client.get("/api/cached").json()
+    assert [r["host"] for r in saved] == ["cloudflare.com"]   # strangers' scans are not saved
+    assert saved[0]["source"] == "cached"
+
+
+def test_falls_back_to_saved_result_when_live_scan_fails(client):
+    live = client.get("/api/scan", params={"host": "github.com"}).json()
+    OFFLINE.add("github.com")
+    try:
+        r = client.get("/api/scan", params={"host": "github.com", "data": "login_session"})
+    finally:
+        OFFLINE.discard("github.com")
+    body = r.json()
+    assert r.status_code == 200 and body["status"] == "ok"
+    assert body["source"] == "cached"
+    assert body["scannedAt"] == live["scannedAt"]            # original time, not now
+    assert body["shelfLife"]["dataType"] == "login_session"  # re-scored for this request
+
+
+def test_no_saved_result_means_error(client):
+    OFFLINE.add("wikipedia.org")
+    try:
+        r = client.get("/api/scan", params={"host": "wikipedia.org"})
+    finally:
+        OFFLINE.discard("wikipedia.org")
+    assert error_of(r) == (200, "timeout")

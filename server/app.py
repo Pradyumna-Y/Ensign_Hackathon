@@ -19,14 +19,16 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Literal
 
 from practice.server import PracticeServer
-from server import scoring
+from server import cache, scoring
 from server.errors import HTTP_STATUS, MESSAGES, ScanError
 from server.limits import RateLimiter, ScanSlots
 from server.results import error_result, ok_result
 from server.scanner import find_openssl, hybrid_self_test, probe_site
-from server.targets import resolve_target
+from server.targets import normalize_host, resolve_target
 
 TOTAL_SCAN_TIMEOUT = 20   # seconds for the whole scan, both probes included
+# Network failures where a saved result is better than an error.
+FALL_BACK_ON = {"timeout", "no_tls", "dns_failed"}
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 log = logging.getLogger("flip")
@@ -104,9 +106,20 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
     if not rate_limiter.allow(client_ip):
         return scan_error_response(shown_host, "rate_limited")
 
+    def failed(name, code):
+        # If the network let us down and we have a saved result, show that,
+        # clearly labeled "cached" with its original time. Otherwise the error.
+        if code in FALL_BACK_ON:
+            saved = cache.load_for_request(name, data, years_int)
+            if saved:
+                return saved
+        return scan_error_response(name, code)
+
     try:
         target = await resolve_target(host)
     except ScanError as e:
+        if e.code == "dns_failed":
+            return failed(normalize_host(host), e.code)
         return scan_error_response(shown_host, e.code)
 
     if not await scan_slots.acquire():
@@ -116,13 +129,25 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
             probe_site(request.app.state.openssl, target.host, target.ip, target.port),
             TOTAL_SCAN_TIMEOUT)
     except asyncio.TimeoutError:
-        return scan_error_response(target.host, "timeout")
+        return failed(target.host, "timeout")
     except ScanError as e:
-        return scan_error_response(target.host, e.code)
+        return failed(target.host, e.code)
     finally:
         scan_slots.release()
 
-    return ok_result(target.host, probe, data, years_int)
+    result = ok_result(target.host, probe, data, years_int)
+    cache.save(result)   # keeps demo sites' saved results fresh; ignores other hosts
+    return result
+
+
+@app.get("/api/cached")
+async def cached():
+    return cache.all_cached()
+
+
+@app.get("/api/demo-sites")
+async def demo_sites():
+    return {"sites": cache.demo_sites()}
 
 
 @app.get("/api/practice")
