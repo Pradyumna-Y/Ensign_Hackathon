@@ -10,8 +10,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PYTHON="${PYTHON:-python3}"
-command -v "$PYTHON" >/dev/null || { echo "Python 3.12 or later is needed (python3 not found)."; exit 1; }
+python_ok() {   # true if "$1" is Python 3.12 or later
+    command -v "$1" >/dev/null 2>&1 &&
+        "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' 2>/dev/null
+}
+PYTHON=""
+for candidate in "${PYTHON_BIN:-}" python3.14 python3.13 python3.12 python3; do
+    if [[ -n "$candidate" ]] && python_ok "$candidate"; then PYTHON="$candidate"; break; fi
+done
+if [[ -z "$PYTHON" ]]; then
+    echo "Python 3.12 or later is needed, and none was found."
+    echo "  macOS:  brew install python@3.13"
+    echo "  Linux:  install python3.12 or later, or use the Docker image."
+    echo "  Then run this again (or set PYTHON_BIN to the python you want)."
+    exit 1
+fi
 
 openssl_ok() {   # true if "$1" is OpenSSL 3.5 or later
     local v major minor
@@ -35,6 +48,9 @@ if [[ -z "$OPENSSL_FOUND" ]]; then
 fi
 export OPENSSL_BIN="$OPENSSL_FOUND"
 
+if [[ -x venv/bin/python ]] && ! python_ok venv/bin/python; then
+    rm -rf venv   # left over from an older Python
+fi
 if [[ ! -x venv/bin/python ]]; then
     echo "First run: creating a virtual environment (about a minute)..."
     "$PYTHON" -m venv venv
