@@ -19,6 +19,7 @@ def test_flip_changes_the_real_handshake():
                 await ps.set_mode(mode)
                 probe = await probe_site(openssl, "practice", "127.0.0.1", TEST_PORT)
                 results.setdefault(mode, []).append(probe["handshake"])
+                results.setdefault("certificates", []).append(probe["certificate"])
         finally:
             await ps.close()
         return results
@@ -29,6 +30,8 @@ def test_flip_changes_the_real_handshake():
         assert handshake["keyExchange"] == "classical"
         v = scoring.verdict(handshake)
         assert v["label"] == "not_ready" and v["score"] == 40
+    cert = results["certificates"][0]
+    assert cert["verified"] is False and "self-signed" in cert["verifyNote"]
     hybrid = results["hybrid"][0]
     assert hybrid["serverPicked"] == "X25519MLKEM768"
     assert hybrid["supportsTls13"] and not hybrid["acceptsTls12"]

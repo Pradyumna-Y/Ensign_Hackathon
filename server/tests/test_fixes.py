@@ -139,6 +139,7 @@ def test_damaged_saved_values_are_ignored(monkeypatch, tmp_path):
     monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
     for change in ({"scannedAt": "garbage"}, {"scannedAt": "2026garbage"},
                    {"verdict": {"label": "x", "score": 1, "headline": "h", "reason": "r"}},
+                   {"verdict": {**valid_saved()["verdict"], "fixes": [None]}},
                    {"handshake": {**valid_saved()["handshake"], "weOffered": None}},
                    {"verdict": {}}, {"shelfLife": {}}):
         (tmp_path / "cloudflare.com.json").write_text(

@@ -200,7 +200,7 @@ async def practice_status(request: Request):
     # a restart in progress, so a reader does not see the gap between modes.
     practice = request.app.state.practice
     try:
-        await asyncio.wait_for(practice.lock.acquire(), 3)
+        await asyncio.wait_for(practice.lock.acquire(), 1)
     except asyncio.TimeoutError:
         return {"mode": practice.mode, "scanHost": "practice"}
     try:

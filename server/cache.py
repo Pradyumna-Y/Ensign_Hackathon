@@ -56,6 +56,8 @@ def _complete(result):
     return (isinstance(handshake, dict) and all(k in handshake for k in HANDSHAKE_KEYS)
             and isinstance(handshake["weOffered"], list)
             and isinstance(verdict, dict) and isinstance(verdict.get("fixes"), list)
+            and all(isinstance(f, dict) and "title" in f and "detail" in f
+                    for f in verdict["fixes"])
             and all(k in verdict for k in VERDICT_KEYS)
             and isinstance(shelf, dict) and all(k in shelf for k in SHELF_KEYS))
 

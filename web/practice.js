@@ -47,8 +47,10 @@ export function practiceView(renderResult) {
       mode = state.mode; updateMode();
       status.innerHTML = loading();
       current = await api.scan(state.scanHost);
-      // The status read can be empty during a restart; then fall back to the scan.
-      mode = state.mode || (current.handshake.keyExchange === 'hybrid_pq' ? 'hybrid' : 'classical');
+      // Read the mode again after the scan, so another judge's flip cannot leave the
+      // switch showing the wrong side. If it is empty, fall back to what the scan saw.
+      const after = await api.practice().catch(() => state);
+      mode = after.mode || (current.handshake.keyExchange === 'hybrid_pq' ? 'hybrid' : 'classical');
       updateMode();
       show(null, current);
       initialized = true;
