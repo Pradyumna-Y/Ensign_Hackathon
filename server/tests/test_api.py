@@ -206,3 +206,15 @@ def test_practice_scan_refuses_when_our_server_is_not_running(client):
 def test_practice_name_variants_use_the_practice_limit(client):
     for _ in range(40):
         assert client.get("/api/scan", params={"host": "Practice."}).status_code == 200
+
+
+def test_security_headers_and_cache_rules(client):
+    api = client.get("/api/health")
+    assert api.headers["Cache-Control"] == "no-store"
+    page = client.get("/")
+    assert page.headers["Cache-Control"] == "no-cache"
+    for r in (api, page):
+        assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+        assert r.headers["Referrer-Policy"] == "no-referrer"
+    assert "script-src 'self'" in page.headers["Content-Security-Policy"]

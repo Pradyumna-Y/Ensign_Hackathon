@@ -57,6 +57,29 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Flip the Lock", lifespan=lifespan, docs_url=None, redoc_url=None)
+
+# The page loads only its own scripts, its own API, and Google Fonts. Inline
+# styles are allowed because the page sets a few style attributes itself.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'")
+
+
+@app.middleware("http")
+async def add_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    # Results must never be replayed from a cache, and the page files are
+    # re-checked on every load so an update is never hidden by an old copy.
+    response.headers["Cache-Control"] = ("no-store" if request.url.path.startswith("/api/")
+                                         else "no-cache")
+    return response
+
 rate_limiter = RateLimiter()
 practice_limiter = RateLimiter(limit=PRACTICE_PER_MINUTE)   # flips and practice scans
 scan_slots = ScanSlots()

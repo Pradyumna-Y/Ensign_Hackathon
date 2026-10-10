@@ -28,4 +28,6 @@ USER app
 # Only the API is published. The practice server listens on 127.0.0.1:8443
 # inside the container, where only our scanner can reach it.
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+  CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000"]
