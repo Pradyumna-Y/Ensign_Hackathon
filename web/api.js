@@ -3,7 +3,7 @@ let practiceMode = 'classical';
 const delay = () => new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 600));
 
 // Parse error JSON even for 4xx and 5xx responses.
-async function request(url, options = {}) {
+async function request(url, options = {}, retries = 0) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
   try {
@@ -11,6 +11,12 @@ async function request(url, options = {}) {
     let body;
     try { body = await response.json(); }
     catch { throw Object.assign(new Error('The scanner returned an unreadable response.'), {code: 'unreachable'}); }
+    // Retry a rate-limited read once. Never repeat a server restart implicitly.
+    if (response.status === 429 && retries === 0 && !options.method) {
+      window.dispatchEvent(new Event('scanner-rate-limit'));
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return await request(url, options, retries + 1);
+    }
     if (body.error || body.status === 'error') {
       throw Object.assign(new Error(body.error?.message || 'The scan failed.'), {
         code: body.error?.code || 'internal', httpStatus: response.status

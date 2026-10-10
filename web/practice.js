@@ -1,5 +1,5 @@
 import * as api from './api.js';
-import {escape, label, errorView, loading} from './views.js';
+import {label, errorView, loading} from './views.js';
 
 export function practiceView(renderResult) {
   const root = document.querySelector('#flip-view');
@@ -13,6 +13,9 @@ export function practiceView(renderResult) {
   let current = null;
   let busy = false;
   let initialized = false;
+  window.addEventListener('scanner-rate-limit', () => {
+    if (busy) status.innerHTML = loading('Too many requests. Waiting a few seconds, then retrying');
+  });
 
   function updateMode() {
     root.querySelectorAll('[data-mode]').forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
@@ -31,7 +34,7 @@ export function practiceView(renderResult) {
     }
   }
   function recover(error, retry) {
-    status.innerHTML = errorView(error);
+    status.innerHTML = errorView(error, true);
     status.querySelector('[data-retry]').addEventListener('click', retry);
   }
   async function load() {

@@ -38,7 +38,10 @@ const errors = {
   internal: 'The scanner could not finish this request. Try again.',
   unreachable: 'The scanner is not running or cannot be reached. Start the backend or choose a saved result below.'
 };
-export function errorView(error) {
-  return `<p>${escape(errors[error.code] || 'This request could not be completed. Try again.')}</p><button class="secondary" type="button" data-retry>Try again</button>`;
+export function errorView(error, practice = false) {
+  const message = practice && error.code === 'unreachable'
+    ? 'The practice server cannot be reached. Start the backend and try again. You can also open Check a site to look for saved results.'
+    : errors[error.code] || 'This request could not be completed. Try again.';
+  return `<p>${escape(message)}</p><button class="secondary" type="button" data-retry>Try again</button>`;
 }
 export function loading(text = 'Scanning') { return `<span class="spinner" aria-hidden="true"></span>${escape(text)}`; }

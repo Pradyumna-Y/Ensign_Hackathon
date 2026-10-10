@@ -1,5 +1,5 @@
 import * as api from './api.js';
-import {escape, verdictView, source, label, errorView, loading} from './views.js';
+import {verdictView, source, label, errorView, loading} from './views.js';
 import {practiceView} from './practice.js';
 import {timelineView} from './timeline.js';
 
@@ -13,6 +13,15 @@ function renderResult(target, result) {
   target.innerHTML = verdictView(result);
   target.querySelector('.timeline-slot').innerHTML = timelineView(result);
 }
+function focusScanResult() {
+  const result = $('#scan-result .result');
+  result.tabIndex = -1;
+  result.focus({preventScroll: true});
+  result.scrollIntoView({block: 'start'});
+}
+window.addEventListener('scanner-rate-limit', () => {
+  if (scanBusy) $('#scan-status').innerHTML = loading('Too many requests. Waiting a few seconds, then retrying');
+});
 const flipPanel = practiceView(renderResult);
 
 async function offerSaved() {
@@ -27,6 +36,7 @@ async function offerSaved() {
       button.addEventListener('click', () => {
         lastResult = result;
         renderResult($('#scan-result'), result);
+        focusScanResult();
         $('#scan-status').textContent = `${label(result)}. ${source(result)}.`;
         $('#empty-note').hidden = true;
       });
@@ -50,6 +60,7 @@ async function runScan() {
   try {
     lastResult = await api.scan(host, $('#data').value, $('#years').value);
     renderResult($('#scan-result'), lastResult);
+    focusScanResult();
     $('#scan-status').textContent = `${host}: ${label(lastResult)}, ${lastResult.verdict.score} out of 100. ${source(lastResult)}.`;
   } catch (error) {
     $('#scan-status').innerHTML = errorView(error);
