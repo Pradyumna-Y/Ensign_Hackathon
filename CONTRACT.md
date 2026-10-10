@@ -22,17 +22,17 @@ The headline demo, "Flip the Lock": a practice server we control. The judge swit
 
 ## Who owns what
 
-| Person | Tool | Owns |
-|---|---|---|
-| A | Claude Code | /server, /practice, /scripts, Dockerfile, README |
-| B | ChatGPT Codex | /web |
+| Person | Owns |
+|---|---|
+| A | /server, /practice, /scripts, Dockerfile, README |
+| B | /web |
 
 Shared files: CONTRACT.md, LEARNED.md. Do not edit the other person's folder. Ask instead.
 
 ## Event rules that affect us
 
 - All work happens during the event. Libraries and open-source code are allowed. Confirm with the organizers that working off-site overnight is allowed; if anyone says otherwise, stop and ask.
-- AI tools must be listed honestly in the README and the submission, and we must answer questions about them. Tools: Claude Code (Anthropic), ChatGPT Codex (OpenAI), Claude chat (planning).
+- Before submitting, list development tools honestly in the README and the submission, and answer questions about them.
 - The repo is public and stays public. Never commit secrets, .env files, or private keys.
 - Everyone must be able to explain every part of their code to judges (the Learning criterion). Keep LEARNED.md: each person adds what they learned, with the time.
 - Submission category: Technical Solution.
@@ -168,7 +168,7 @@ Protect: the verdict screen, Flip the lock, and cached results.
 
 ## Final checklist
 
-- Repo is public, README has how to run and the AI tools list, LEARNED.md is filled in.
+- Repo is public, README has how to run and the final development tools list, LEARNED.md is filled in.
 - Cache is seeded and the practice server was tested on the demo laptop.
 - Demo laptop: notifications off, sleep off, charger plugged in, browser zoomed for the projector or table.
 - Backup recording saved and uploaded where the rules ask (ask organizers about the video requirement).

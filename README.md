@@ -66,7 +66,7 @@ do a test handshake with a known hybrid site, so a site is never labeled
 | TLS version: older or unknown | 0 |
 
 "Ready" at 80 or above, so only hybrid key exchange can be ready. The
-headline, reason and up to 3 fixes come from fixed rules, not AI.
+headline, reason and up to 3 fixes come from fixed rules.
 
 Shelf life compares how long the chosen data must stay secret (health records
 30 years, bank records 25, government documents 50, login session 0) with the
@@ -164,9 +164,3 @@ Otherwise the key exchange would be the platform's, not ours.
 | `CONTRACT.md` | Shared | API and wording both sides follow |
 | `LEARNED.md` | Shared | What each of us learned, with times |
 
-## AI tools used
-
-- Claude Code (Anthropic): backend (`server/`, `practice/`, `scripts/`,
-  Dockerfile, README).
-- ChatGPT Codex (OpenAI): frontend (`web/`).
-- Claude chat (Anthropic): planning.
