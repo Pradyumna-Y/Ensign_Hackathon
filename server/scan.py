@@ -18,7 +18,7 @@ async def resolve(host):
         infos = await asyncio.get_running_loop().getaddrinfo(
             host, 443, type=socket.SOCK_STREAM)
     except socket.gaierror:
-        raise ScanError("dns_failed", "We could not find that site. Check the spelling.")
+        raise ScanError("dns_failed")
     infos.sort(key=lambda i: i[0] != socket.AF_INET)
     return infos[0][4][0]
 

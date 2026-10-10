@@ -53,7 +53,7 @@ All responses are JSON. Errors never leak stack traces.
 
 ### GET /api/scan?host=<hostname>&data=<dataType>&years=<int>
 
-- `host`: a public hostname, or the reserved name `practice`, which scans our local practice server.
+- `host`: a public hostname, or the reserved name `practice`, which scans our local practice server. Send only the name: the API rejects `https://`, paths, ports and IP addresses with `invalid_host`, so the frontend should strip a scheme or path the user pasted before sending.
 - `data`: one of `health_records` (default years 30), `bank_records` (25), `government_docs` (50), `login_session` (0), `custom` (needs `years`).
 - `years`: optional override, 0 to 100.
 
@@ -110,7 +110,8 @@ Field rules:
 
 - `source`: `live` or `cached`.
 - `status`: `ok` or `error`. When `error`, `handshake`, `certificate`, `verdict` and `shelfLife` are null and `error` is `{ "code": "...", "message": "plain English, safe to show" }`.
-- `error.code`: `invalid_host`, `blocked_target`, `dns_failed`, `timeout`, `no_tls`, `rate_limited`, `internal`.
+- `error.code`: `invalid_host`, `invalid_input` (bad `data` or `years`), `blocked_target`, `dns_failed`, `timeout`, `no_tls`, `rate_limited`, `internal`.
+- HTTP status: errors in the request get 4xx (`invalid_host` and `invalid_input` 400, `blocked_target` 403, `rate_limited` 429) and `internal` gets 500. A scan that ran but could not reach a TLS server (`dns_failed`, `timeout`, `no_tls`) is HTTP 200 with `status: "error"`. Always read the JSON body, whatever the status.
 - `handshake.keyExchange`: `hybrid_pq`, `classical`, `static_rsa`, or `unknown`.
 - `handshake.serverPicked` can be null (for example TLS 1.2 with no named group).
 - `verdict.label`: `ready` (score 80 to 100) or `not_ready` (score 0 to 79).

@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
+from server.errors import ScanError
+
 # What our TLS 1.3 probe offers, in order of preference. secp384r1 is there so
 # a server that only does P-384 is not wrongly reported as "no TLS 1.3".
 OFFERED_GROUPS = ["X25519MLKEM768", "X25519", "secp256r1", "secp384r1"]
@@ -30,15 +32,6 @@ WINDOWS_CANDIDATES = [
     r"C:\Program Files\Git\mingw64\bin\openssl.exe",
     r"C:\Program Files\Git\usr\bin\openssl.exe",
 ]
-
-
-class ScanError(Exception):
-    """A scan failed in a way we can explain. `code` is one of the contract codes."""
-
-    def __init__(self, code, message):
-        super().__init__(message)
-        self.code = code
-        self.message = message
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +277,8 @@ async def probe_site(openssl, host, ip, port=443):
 
     if not tls13.ok and not tls12.ok:
         if tls13.failure == "timeout" and tls12.failure == "timeout":
-            raise ScanError("timeout", "The site did not answer in time. Try again in a moment.")
-        raise ScanError("no_tls", "This site did not complete a TLS 1.2 or 1.3 handshake on port 443.")
+            raise ScanError("timeout")
+        raise ScanError("no_tls")
 
     main = tls13 if tls13.ok else tls12
     return {
