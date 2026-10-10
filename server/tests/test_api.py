@@ -218,3 +218,10 @@ def test_security_headers_and_cache_rules(client):
         assert r.headers["X-Content-Type-Options"] == "nosniff"
         assert r.headers["Referrer-Policy"] == "no-referrer"
     assert "script-src 'self'" in page.headers["Content-Security-Policy"]
+
+
+def test_unexpected_error_still_carries_the_safe_headers(client):
+    r = client.get("/api/scan", params={"host": "boom.example"})
+    assert r.status_code == 500
+    assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+    assert r.headers["Cache-Control"] == "no-store"

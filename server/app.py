@@ -67,18 +67,20 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'self'; frame-ancestors 'none'")
 
 
-@app.middleware("http")
-async def add_headers(request, call_next):
-    response = await call_next(request)
+def with_safe_headers(response, path):
     response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
     # Results must never be replayed from a cache, and the page files are
     # re-checked on every load so an update is never hidden by an old copy.
-    response.headers["Cache-Control"] = ("no-store" if request.url.path.startswith("/api/")
-                                         else "no-cache")
+    response.headers["Cache-Control"] = "no-store" if path.startswith("/api/") else "no-cache"
     return response
+
+
+@app.middleware("http")
+async def add_headers(request, call_next):
+    return with_safe_headers(await call_next(request), request.url.path)
 
 rate_limiter = RateLimiter()
 practice_limiter = RateLimiter(limit=PRACTICE_PER_MINUTE)   # flips and practice scans
@@ -96,8 +98,10 @@ def scan_error_response(host, code, message=None):
 @app.exception_handler(Exception)
 async def on_unexpected(request, exc):
     log.exception("unhandled error")
-    return JSONResponse({"error": {"code": "internal", "message": "Something went wrong "
-                                   "on our side. Try again."}}, status_code=500)
+    return with_safe_headers(
+        JSONResponse({"error": {"code": "internal", "message": "Something went wrong "
+                                "on our side. Try again."}}, status_code=500),
+        request.url.path)
 
 
 @app.exception_handler(RequestValidationError)

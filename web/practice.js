@@ -42,7 +42,7 @@ export function practiceView(renderResult) {
   }
   async function load() {
     if (busy) return;
-    busy = true; button.disabled = true;
+    busy = true; button.disabled = true; reset.disabled = true;
     status.innerHTML = loading('Loading the practice server');
     try {
       const state = await api.practice();
@@ -59,11 +59,11 @@ export function practiceView(renderResult) {
       status.textContent = `Current connection: ${label(current)}, ${current.verdict.score} out of 100.`
         + (mode === 'hybrid' ? ' It is on the new lock. Use Reset to start from the old lock.' : '');
     } catch (error) { recover(error, load); }
-    finally { busy = false; button.disabled = !initialized; }
+    finally { busy = false; button.disabled = !initialized; reset.disabled = false; }
   }
   async function flip() {
     if (busy || !current) return;
-    busy = true; button.disabled = true;
+    busy = true; button.disabled = true; reset.disabled = true;
     status.innerHTML = loading(api.mock ? 'Switching the mock practice result' : 'Restarting the practice server');
     const before = current;
     try {
@@ -82,7 +82,10 @@ export function practiceView(renderResult) {
       comparison.replaceChildren();   // never leave an old result beside an error
       recover(error, load);
       initialized = false;
-    } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus({preventScroll: true}); }
+    } finally {
+      busy = false; button.disabled = !initialized; reset.disabled = false;
+      if (initialized) button.focus({preventScroll: true});
+    }
   }
   async function resetDemo() {
     if (busy) return;

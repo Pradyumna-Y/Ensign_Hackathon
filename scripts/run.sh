@@ -51,8 +51,12 @@ export OPENSSL_BIN="$OPENSSL_FOUND"
 if [[ -x venv/bin/python ]] && ! python_ok venv/bin/python; then
     rm -rf venv   # left over from an older Python
 fi
+if [[ -d venv ]] && ! venv/bin/python -c 'import sys' 2>/dev/null; then
+    rm -rf venv   # broken, for example its Python was uninstalled
+fi
 if [[ ! -x venv/bin/python ]]; then
     echo "First run: creating a virtual environment (about a minute)..."
+    rm -rf venv
     "$PYTHON" -m venv venv
 fi
 if [[ ! -f venv/.installed || requirements.txt -nt venv/.installed ]]; then
@@ -60,20 +64,24 @@ if [[ ! -f venv/.installed || requirements.txt -nt venv/.installed ]]; then
     touch venv/.installed
 fi
 
-free_port() {   # first free TCP port at or above $1
-    venv/bin/python - "$1" <<'PY'
+free_port() {   # first TCP port at or above $1 that we can bind, skipping $2
+    venv/bin/python - "$1" "${2:-0}" <<'PY'
 import socket, sys
-port = int(sys.argv[1])
+port, skip = int(sys.argv[1]), int(sys.argv[2])
 while True:
-    with socket.socket() as s:
-        if s.connect_ex(("127.0.0.1", port)) != 0:
-            print(port)
-            break
+    if port != skip:
+        with socket.socket() as s:
+            try:
+                s.bind(("127.0.0.1", port))
+                print(port)
+                break
+            except OSError:
+                pass
     port += 1
 PY
 }
 PORT="$(free_port "${PORT:-8000}")"
-export PRACTICE_PORT="$(free_port "${PRACTICE_PORT:-8443}")"
+export PRACTICE_PORT="$(free_port "${PRACTICE_PORT:-8443}" "$PORT")"
 
 URL="http://127.0.0.1:$PORT"
 echo "OpenSSL: $OPENSSL_BIN ($("$OPENSSL_BIN" version | awk '{print $2}'))"
