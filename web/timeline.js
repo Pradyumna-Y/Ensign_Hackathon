@@ -21,8 +21,10 @@ export function timelineView(result) {
     <svg viewBox="0 0 640 122" role="img" aria-label="${escape(text)}">
       <rect x="${x(s.quantumArrivalYear)}" y="6" width="${622-x(s.quantumArrivalYear)}" height="82" fill="#5B4BDB" opacity=".13"/>
       <line x1="${x(s.quantumArrivalYear)}" x2="${x(s.quantumArrivalYear)}" y1="6" y2="88" stroke="#5B4BDB" stroke-width="2"/>
+      <text x="${x(s.quantumArrivalYear)}" y="23" font-size="19" text-anchor="middle" fill="#5B4BDB">${s.quantumArrivalYear}</text>
       <rect x="${x(now)}" y="31" width="${Math.max(3,x(s.secretUntilYear)-x(now))}" height="24" rx="2" fill="${color}"/>
       <circle cx="${x(s.secretUntilYear)}" cy="43" r="4" fill="${color}"/>
+      <text x="${x(s.secretUntilYear)}" y="76" font-size="19" text-anchor="${x(s.secretUntilYear) < 100 ? 'start' : x(s.secretUntilYear) > 540 ? 'end' : 'middle'}" fill="${color}">Until ${s.secretUntilYear}</text>
       <line x1="18" x2="622" y1="88" y2="88" stroke="#7F8DA0"/>
       <text x="18" y="112" font-size="19" fill="#0F1B2D">${start}${start === now ? ' · now' : ''}</text>
       <text x="622" y="112" font-size="19" text-anchor="end" fill="#0F1B2D">${end}</text>

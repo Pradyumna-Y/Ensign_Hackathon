@@ -77,14 +77,18 @@ $('#data').addEventListener('change', () => { $('#years').value = defaults[$('#d
 async function loadExamples() {
   try {
     const {sites} = await api.demoSites();
-    for (const host of sites) {
+    const priority = ['cloudflare.com', 'github.com', 'static-rsa.badssl.com'];
+    const featured = [...priority.filter(host => sites.includes(host)), ...sites.filter(host => !priority.includes(host))].slice(0, 3);
+    const ordered = [...featured, ...sites.filter(host => !featured.includes(host))];
+    for (const [index, host] of ordered.entries()) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'chip'; button.textContent = host;
       button.addEventListener('click', () => {
         $('#host').value = host; $('#host').focus();
       });
-      $('#demo-sites').append(button);
+      $(index < 3 ? '#demo-sites' : '#demo-more').append(button);
     }
+    $('#more-examples').hidden = ordered.length <= 3;
   } catch { $('#demo-sites').textContent = 'Examples are unavailable. Enter any public hostname.'; }
 }
 function route() {

@@ -14,23 +14,30 @@
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="topbar"><a class="brand" href="#scan"><span aria-hidden="true">◈</span> Flip the Lock</a><nav aria-label="Main"><a href="#scan">Check a site</a><a href="#flip">Flip the lock</a></nav></header>
+  <header class="topbar">
+    <a class="brand" href="#scan"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 14v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span>Flip the Lock<small>Connection readiness</small></span></a>
+    <nav aria-label="Main"><a href="#scan">Check a site</a><a href="#flip">Flip the lock <span aria-hidden="true">↗</span></a></nav>
+  </header>
   <div id="mock-banner" class="banner" hidden>Mock demo: these are sample results, not real scans.</div>
   <main id="main" tabindex="-1">
     <section id="scan-view" aria-labelledby="scan-title">
-      <div class="intro"><p class="eyebrow">Recorded today. Read years later?</p><h1 id="scan-title">Will your connection<br>outlast the quantum era?</h1><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p></div>
+      <div class="scan-layout">
+      <div class="intro"><p class="eyebrow"><span aria-hidden="true"></span>A check for the quantum era</p><h1 id="scan-title">Today's traffic.<br>Tomorrow's<br><span class="muted-title">secrets.</span></h1><p class="intro-description">A website's key exchange decides whether traffic recorded today could be read by a future quantum computer.</p><div class="scope-note"><span class="scope-icon" aria-hidden="true">↳</span><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p></div></div>
       <form id="scan-form" class="scan-form">
+        <div class="form-heading"><h2>Check a website</h2><p>Start with a public website address.</p></div>
         <div class="host-field"><label for="host">Website address</label><input id="host" name="host" type="text" placeholder="cloudflare.com" required autocapitalize="none" spellcheck="false" autocomplete="url"><p class="hint">Paste a website address. We only send its hostname.</p></div>
-        <div class="choices"><div><label for="data">What needs to stay secret?</label><select id="data" name="data"><option value="health_records">Health records</option><option value="bank_records">Bank records</option><option value="government_docs">Government documents</option><option value="login_session">Login session</option></select></div><div><label for="years">For how many years?</label><input id="years" name="years" type="number" min="0" max="100" step="1" value="30" required></div><button id="scan-button" class="primary" type="submit">Scan this site <span aria-hidden="true">↗</span></button></div>
-        <div class="examples"><span>Try a site</span><div id="demo-sites"></div></div>
+        <div class="choices"><div><label for="data">Data to keep secret</label><select id="data" name="data"><option value="health_records">Health records</option><option value="bank_records">Bank records</option><option value="government_docs">Government documents</option><option value="login_session">Login session</option></select></div><div><label for="years">For how many years?</label><input id="years" name="years" type="number" min="0" max="100" step="1" value="30" required></div></div>
+        <button id="scan-button" class="primary" type="submit">Scan this site <span aria-hidden="true">↗</span></button>
+        <div class="examples"><span>Or try an example</span><div id="demo-sites"></div><details id="more-examples" hidden><summary>More example sites <span aria-hidden="true">+</span></summary><div id="demo-more"></div></details></div>
       </form>
+      </div>
       <div id="scan-status" class="status" role="status" aria-live="polite"></div>
       <div id="scan-result"></div>
       <div id="saved-results"></div>
-      <p id="empty-note" class="empty-note">Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p>
+      <p id="empty-note" class="empty-note"><span aria-hidden="true">i</span>Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p>
     </section>
     <section id="flip-view" hidden aria-labelledby="flip-title"></section>
   </main>
-  <footer>We cannot see databases, passwords, or anything behind the connection.<br>The year quantum computers arrive is an assumption. Estimates vary.</footer>
+  <footer><span class="footer-name">Flip the Lock</span><p>We cannot see databases, passwords, or anything behind the connection.<br>The year quantum computers arrive is an assumption. Estimates vary.</p><a href="#flip">Try the practice server <span aria-hidden="true">↗</span></a></footer>
 </body>
 </html>

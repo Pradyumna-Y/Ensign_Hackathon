@@ -3,8 +3,8 @@ import {label, errorView, loading} from './views.js';
 
 export function practiceView(renderResult) {
   const root = document.querySelector('#flip-view');
-  root.innerHTML = `<div class="intro"><p class="eyebrow">One connection. Two ways to agree on a key.</p><h1 id="flip-title">Flip the lock.</h1><p>The practice server is ours, and this switch really changes how it agrees on keys.</p><p id="practice-mock" ${api.mock ? '' : 'hidden'}>In this mock demo, the switch alternates sample results instead of restarting a server.</p></div>
-    <div class="flip-controls"><div class="mode-labels"><span data-mode="classical">Old lock</span><span aria-hidden="true">↔</span><span data-mode="hybrid">New lock</span></div><button id="flip-button" class="primary" type="button" role="switch" aria-label="New lock" aria-checked="false" disabled>Load practice server</button></div>
+  root.innerHTML = `<div class="intro flip-intro"><p class="eyebrow"><span aria-hidden="true"></span>See the difference, one switch at a time</p><h1 id="flip-title">Same server.<br><span class="muted-title">A different lock.</span></h1><p class="intro-description">The practice server is ours, and this switch really changes how it agrees on keys.</p><p id="practice-mock" ${api.mock ? '' : 'hidden'}>In this mock demo, the switch alternates sample results instead of restarting a server.</p></div>
+    <div class="flip-controls"><div><p class="control-caption">Practice server key exchange</p><div class="mode-labels"><span data-mode="classical">Old lock</span><span class="mode-track" aria-hidden="true"><i></i></span><span data-mode="hybrid">New lock</span></div></div><button id="flip-button" class="primary" type="button" role="switch" aria-label="New lock" aria-checked="false" disabled>Load practice server</button></div>
     <div id="flip-status" class="status" role="status" aria-live="polite"></div><div id="comparison" class="compare single"></div>`;
   const status = root.querySelector('#flip-status');
   const button = root.querySelector('#flip-button');
@@ -20,6 +20,7 @@ export function practiceView(renderResult) {
   function updateMode() {
     root.querySelectorAll('[data-mode]').forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
     button.setAttribute('aria-checked', String(mode === 'hybrid'));
+    root.querySelector('.mode-track').classList.toggle('hybrid', mode === 'hybrid');
     button.textContent = mode === 'hybrid' ? 'Switch to the old lock' : 'Switch to the new lock';
   }
   function show(before, after, animate = false) {

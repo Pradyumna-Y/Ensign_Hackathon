@@ -14,11 +14,10 @@ export function verdictView(result) {
   const ready = v.label === 'ready';
   return `<article class="result ${ready ? 'ready' : ''}" aria-label="${escape(result.host)} result">
     <div class="result-meta"><span class="host">${escape(result.host)}</span><span class="badge">${escape(source(result))}</span></div>
-    <h2 class="verdict-label"><span aria-hidden="true">${ready ? '✓' : '!'}</span> ${label(result)}</h2>
-    <p class="headline">${escape(v.headline)}</p><p class="reason">${escape(v.reason)}</p>
-    <div class="meter-label"><span>Connection readiness</span><strong>${escape(v.score)} / 100</strong></div>
+    <div class="verdict-summary"><div><h2 class="verdict-label"><span class="verdict-icon" aria-hidden="true">${ready ? '✓' : '!'}</span>${label(result)}</h2><p class="headline">${escape(v.headline)}</p><p class="reason">${escape(v.reason)}</p></div><div class="score-number" aria-hidden="true"><strong>${escape(v.score)}</strong><span>out of 100</span></div></div>
+    <div class="meter-label"><span>Connection readiness</span><span>Ready at 80</span></div>
     <div class="meter" role="meter" aria-label="Connection readiness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(v.score)}" style="--score:${Number(v.score)}%"><div class="meter-fill"></div><span class="threshold" aria-hidden="true"></span></div>
-    <p class="meter-caption">Ready at 80 · Score checks key exchange and TLS only</p>
+    <p class="meter-caption">Score checks key exchange and TLS only</p>
     <div class="handshake"><div><p>Your browser offered</p><div class="protocols">${h.weOffered.map(g => chip(g)).join('')}</div></div><span aria-hidden="true">→</span><div><p>The site picked</p><div class="protocols">${h.serverPicked ? chip(h.serverPicked, true) : `<span class="protocol picked">No named group<small>${h.keyExchange === 'static_rsa' ? 'old method: RSA key exchange' : 'method not identified'}</small></span>`}</div></div></div>
     <p class="tls"><code>${escape(h.tlsVersion)}</code> · ${h.acceptsTls12 ? 'TLS 1.2 also accepted' : 'TLS 1.2 not accepted'}</p>
     <div class="timeline-slot"></div>
