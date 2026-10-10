@@ -34,3 +34,21 @@ def test_flip_changes_the_real_handshake():
     assert hybrid["supportsTls13"] and not hybrid["acceptsTls12"]
     v = scoring.verdict(hybrid)
     assert v["label"] == "ready" and v["score"] == 100
+
+
+def test_asking_for_the_current_mode_does_not_restart():
+    async def run():
+        openssl, _ = find_openssl()
+        ps = PracticeServer(openssl, port=TEST_PORT + 1)
+        try:
+            await ps.set_mode("classical")
+            first = ps.proc.pid
+            await ps.set_mode("classical")
+            same = ps.proc.pid
+            await ps.set_mode("hybrid")
+            return first, same, ps.proc.pid
+        finally:
+            await ps.close()
+
+    first, same, after_flip = asyncio.run(run())
+    assert first == same and after_flip != first

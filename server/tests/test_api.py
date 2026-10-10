@@ -1,5 +1,7 @@
 """API tests with the network parts replaced, so they run offline and fast."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -45,6 +47,7 @@ def client(monkeypatch, tmp_path):
     class FakePractice:
         def __init__(self, openssl):
             self.mode = None
+            self.lock = asyncio.Lock()
 
         async def set_mode(self, mode):
             self.mode = mode
@@ -59,6 +62,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(app_module, "resolve_target", resolve)
     monkeypatch.setattr(app_module, "probe_site", probe)
     monkeypatch.setattr(app_module, "rate_limiter", RateLimiter())
+    monkeypatch.setattr(app_module, "practice_limiter", RateLimiter(limit=120))
     with TestClient(app_module.app, raise_server_exceptions=False) as c:
         yield c
 
@@ -167,3 +171,22 @@ def test_no_saved_result_means_error(client):
     finally:
         OFFLINE.discard("wikipedia.org")
     assert error_of(r) == (200, "timeout")
+
+
+def test_practice_has_its_own_rate_limit(client):
+    for _ in range(31):
+        client.get("/api/scan", params={"host": "cloudflare.com"})
+    # outside scans are now limited, but flipping and scanning practice still work
+    assert client.get("/api/scan", params={"host": "cloudflare.com"}).status_code == 429
+    assert client.post("/api/practice/mode", json={"mode": "hybrid"}).status_code == 200
+    r = client.get("/api/scan", params={"host": "practice"})
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+
+
+def test_failed_practice_restart_is_a_clean_error(client, monkeypatch):
+    async def broken(mode):
+        raise RuntimeError("port 8443 is already in use")
+    monkeypatch.setattr(client.app.state.practice, "set_mode", broken)
+    r = client.post("/api/practice/mode", json={"mode": "hybrid"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "internal"
+    assert "8443" not in r.text

@@ -30,11 +30,26 @@ def save(result):
     """Save a successful live result for a demo site. Returns True if saved."""
     if result.get("status") != "ok" or result["host"] not in demo_sites():
         return False
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = _path(result["host"]).with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    os.replace(tmp, _path(result["host"]))   # atomic: never a half-written file
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _path(result["host"]).with_suffix(".tmp")
+        tmp.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        os.replace(tmp, _path(result["host"]))   # atomic: never a half-written file
+    except OSError:
+        return False   # a cache problem must never turn a good scan into an error
     return True
+
+
+HANDSHAKE_KEYS = ("keyExchange", "supportsTls13", "acceptsTls12", "serverPicked", "weOffered")
+
+
+def _complete(result):
+    """True if a saved file has everything the page needs, so a damaged file is ignored."""
+    handshake = result.get("handshake")
+    return (isinstance(handshake, dict) and all(k in handshake for k in HANDSHAKE_KEYS)
+            and isinstance(result.get("verdict"), dict)
+            and isinstance(result.get("shelfLife"), dict)
+            and isinstance(result.get("scannedAt"), str))
 
 
 def load(host):
@@ -43,7 +58,7 @@ def load(host):
         result = json.loads(_path(host).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if result.get("status") != "ok" or result.get("host") != host:
+    if result.get("status") != "ok" or result.get("host") != host or not _complete(result):
         return None
     result["source"] = "cached"
     return result
