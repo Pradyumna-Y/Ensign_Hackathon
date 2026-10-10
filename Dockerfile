@@ -21,6 +21,10 @@ COPY practice practice
 COPY scripts scripts
 COPY web web
 
+# Run as an ordinary user, not root. cache/ is where saved results live.
+RUN useradd --create-home app && mkdir -p /app/cache && chown -R app /app
+USER app
+
 # Only the API is published. The practice server listens on 127.0.0.1:8443
 # inside the container, where only our scanner can reach it.
 EXPOSE 8000

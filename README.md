@@ -25,8 +25,13 @@ Built for Ensign BUILD, Technical Solution category.
   sign of carelessness. Ordinary computers cannot break these connections
   today.
 - We cannot see databases, passwords, or anything behind the connection.
-- Certificates are shown for context but not scored. They matter for
-  impersonation later, not for traffic recorded today.
+- Certificates are shown for context but not scored. With an ephemeral key
+  exchange, a stolen certificate key alone cannot decrypt traffic recorded
+  today. Static RSA key exchange is the exception. We do not verify the
+  certificate's identity, so a result describes the server our scanner reached.
+- "Ready" means our scanner negotiated a hybrid group on this one connection.
+  Other clients, older TLS versions, and other servers behind the same name
+  may behave differently. A bare domain and its `www` name can differ.
 - The year quantum computers arrive is an assumption. We use 2040 and say so
   on screen. Estimates vary.
 - Live results are labeled "Live scan". Saved results are labeled with the
@@ -37,8 +42,9 @@ Built for Ensign BUILD, Technical Solution category.
 For each site we make two real TLS connections with the OpenSSL 3.5 command
 line:
 
-1. TLS 1.3, offering `X25519MLKEM768` first, then `X25519`, `secp256r1`,
-   `secp384r1`. We read which group the server picked.
+1. TLS 1.3, offering the hybrid groups `X25519MLKEM768`, `SecP256r1MLKEM768`
+   and `SecP384r1MLKEM1024` first, then `X25519`, `secp256r1`, `secp384r1`.
+   We read which group the server picked.
 2. TLS 1.2 only, to see whether old clients are still accepted and whether
    the key exchange is ephemeral (ECDHE/DHE) or static RSA.
 
@@ -50,8 +56,9 @@ line:
 | `unknown` | Handshake finished but the method could not be identified. |
 
 At startup we check that our own OpenSSL can offer the hybrid group, and we
-do a test handshake with a known hybrid site, so a site is never labeled
-"classical" because of our tooling.
+try a test handshake with a known hybrid site (skipped without internet). A
+failed handshake is retried once before we conclude a site lacks a protocol,
+because a dropped packet looks the same as a refusal.
 
 ## Scoring
 
@@ -60,10 +67,10 @@ do a test handshake with a known hybrid site, so a site is never labeled
 | Key exchange: hybrid_pq | 80 |
 | Key exchange: classical (ephemeral) | 20 |
 | Key exchange: static_rsa or unknown | 0 |
-| TLS version: TLS 1.3 only | 20 |
-| TLS version: TLS 1.3 plus TLS 1.2 accepted | 15 |
+| TLS version: TLS 1.3, and TLS 1.2 not accepted | 20 |
+| TLS version: TLS 1.3, and TLS 1.2 also accepted | 15 |
 | TLS version: TLS 1.2 only | 5 |
-| TLS version: older or unknown | 0 |
+| TLS version: no TLS 1.2 or 1.3 handshake | 0 |
 
 "Ready" at 80 or above, so only hybrid key exchange can be ready. The
 headline, reason and up to 3 fixes come from fixed rules.
@@ -78,10 +85,21 @@ assumed 2040 quantum arrival. Urgency is shown but never changes the score.
 
 ```
 docker build -t flip-the-lock .
-docker run --rm -p 8000:8000 flip-the-lock
+docker run --rm -p 8000:8000 -v "$PWD/cache:/app/cache" flip-the-lock
 ```
 
-Open http://localhost:8000.
+The `-v` option shares the `cache/` folder (see "Saved results" below) so
+saved results survive restarts. Open http://localhost:8000.
+
+If the app sits behind a proxy, start uvicorn with
+`--forwarded-allow-ips=<proxy address>`, or every visitor shares one rate
+limit.
+
+### Saved results
+
+Run `python scripts/seed_cache.py` on the demo machine, on the demo network,
+before the demo. Saved results are used only when a live scan of a demo site
+times out, finds no TLS, or cannot resolve the name.
 
 ### Without Docker
 
@@ -95,7 +113,12 @@ venv\Scripts\pip install -r requirements-dev.txt
 venv\Scripts\python -m uvicorn server.app:app --port 8000
 ```
 
-On macOS or Linux use `venv/bin/` instead of `venv\Scripts\`. On Windows,
+On macOS or Linux use `venv/bin/` instead of `venv\Scripts\`. The OpenSSL
+that ships with macOS (LibreSSL) is too old: run `brew install openssl@3` and
+set `OPENSSL_BIN=/opt/homebrew/opt/openssl@3/bin/openssl`. Linux releases
+older than Debian 13 or Ubuntu 25.04 also need a newer OpenSSL. The practice
+server uses port 8443; if something else holds it, set `PRACTICE_PORT` to
+another port, and the app still starts without the practice server. On Windows,
 do not add `--reload`: reload mode switches to an event loop that cannot
 start the OpenSSL processes.
 
@@ -142,8 +165,10 @@ security-sensitive surface:
 - Port 443 only. The reserved name `practice` maps to our own practice
   server and is the only way to reach a local port.
 - 8 second timeout per handshake, 20 seconds per scan, output size capped.
-- At most 6 scans at once, and about 30 scans per minute per client IP
-  (HTTP 429 after that).
+- At most 6 scans at once (3 per client), and about 30 scans per minute per
+  client IP (HTTP 429 after that). The practice server has its own, larger
+  limit so flipping it cannot be locked out by outside scans.
+- At most 8 DNS lookups at once.
 - OpenSSL runs with an argument list, never through a shell. Responses never
   include raw OpenSSL output or stack traces.
 - The practice server's certificate and key are made fresh at startup in a
