@@ -188,5 +188,17 @@ def test_failed_practice_restart_is_a_clean_error(client, monkeypatch):
         raise RuntimeError("port 8443 is already in use")
     monkeypatch.setattr(client.app.state.practice, "set_mode", broken)
     r = client.post("/api/practice/mode", json={"mode": "hybrid"})
-    assert r.status_code == 503 and r.json()["error"]["code"] == "internal"
+    assert r.status_code == 500 and r.json()["error"]["code"] == "internal"
     assert "8443" not in r.text
+
+
+def test_practice_scan_refuses_when_our_server_is_not_running(client):
+    client.app.state.practice.mode = None   # e.g. its port was taken at startup
+    for host in ("practice", "Practice."):
+        r = client.get("/api/scan", params={"host": host})
+        assert error_of(r) == (200, "no_tls")
+
+
+def test_practice_name_variants_use_the_practice_limit(client):
+    for _ in range(40):
+        assert client.get("/api/scan", params={"host": "Practice."}).status_code == 200

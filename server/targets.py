@@ -94,7 +94,11 @@ async def resolve_target(raw_host):
         await asyncio.wait_for(_dns_gate.acquire(), DNS_TIMEOUT)
     except asyncio.TimeoutError:
         raise ScanError("rate_limited")
-    lookup = asyncio.ensure_future(loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
+    try:
+        lookup = asyncio.ensure_future(loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
+    except BaseException:
+        _dns_gate.release()
+        raise
 
     def lookup_finished(done):
         # A lookup keeps its thread until the resolver answers, even after we

@@ -45,11 +45,13 @@ HANDSHAKE_KEYS = ("keyExchange", "supportsTls13", "acceptsTls12", "serverPicked"
 
 def _complete(result):
     """True if a saved file has everything the page needs, so a damaged file is ignored."""
-    handshake = result.get("handshake")
+    handshake, verdict, shelf = (result.get(k) for k in ("handshake", "verdict", "shelfLife"))
     return (isinstance(handshake, dict) and all(k in handshake for k in HANDSHAKE_KEYS)
-            and isinstance(result.get("verdict"), dict)
-            and isinstance(result.get("shelfLife"), dict)
-            and isinstance(result.get("scannedAt"), str))
+            and isinstance(handshake["weOffered"], list)
+            and isinstance(verdict, dict) and "label" in verdict and "score" in verdict
+            and isinstance(shelf, dict) and "years" in shelf
+            and isinstance(result.get("scannedAt"), str)
+            and result["scannedAt"][:4].isdigit())
 
 
 def load(host):

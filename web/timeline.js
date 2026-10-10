@@ -11,7 +11,7 @@ export function timelineView(result) {
   const overlap = s.secretUntilYear > s.quantumArrivalYear && !hybrid;
   const color = hybrid ? '#12805C' : s.urgency === 'medium' ? '#9A6700' : s.urgency === 'high' ? '#C23B32' : '#0F1B2D';
   const text = hybrid
-    ? `This data must stay secret until ${s.secretUntilYear}. Connections that use the hybrid key exchange are protected against recorded-traffic attacks.`
+    ? `This data must stay secret until ${s.secretUntilYear}. A connection that uses the hybrid key exchange resists a future quantum computer reading recorded traffic.`
     : overlap
       ? `This data must stay secret until ${s.secretUntilYear}. Recorded traffic today could be read from ${s.quantumArrivalYear}.`
       : `This data must stay secret until ${s.secretUntilYear}, no later than the assumed quantum arrival in ${s.quantumArrivalYear}. This connection still uses ${result.handshake.keyExchange === 'unknown' ? 'an unidentified' : 'an old'} key method.`;

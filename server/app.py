@@ -110,7 +110,10 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
         return scan_error_response(shown_host, "invalid_input")
 
     client_ip = request.client.host if request.client else "unknown"
-    is_practice = shown_host.lower() == "practice"
+    try:
+        is_practice = normalize_host(shown_host) == "practice"   # also "Practice." etc.
+    except ScanError:
+        is_practice = False
     if not (practice_limiter if is_practice else rate_limiter).allow(client_ip):
         return scan_error_response(shown_host, "rate_limited")
 
@@ -137,29 +140,41 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
 
     if is_practice:
         # The local practice server skips the shared scan slots, so a busy
-        # outside scanner cannot block the demo. It does wait for any restart
-        # in progress, so a scan never lands on a half-restarted server.
+        # outside scanner cannot block the demo. It waits for any restart in
+        # progress (inside the same deadline), so a scan never lands on a
+        # half-restarted server, and never scans something else on its port.
+        practice = request.app.state.practice
+
+        async def practice_scan():
+            async with practice.lock:
+                if practice.mode is None:
+                    raise ScanError("no_tls")   # our practice server is not running
+                return await probe_site(request.app.state.openssl, target.host,
+                                        target.ip, target.port)
         try:
-            async with request.app.state.practice.lock:
-                probe = await run_probe()
+            probe = await asyncio.wait_for(practice_scan(), TOTAL_SCAN_TIMEOUT)
         except asyncio.TimeoutError:
             return failed(target.host, "timeout")
         except ScanError as e:
             return failed(target.host, e.code)
     else:
-        if scans_in_flight.get(client_ip, 0) >= MAX_SCANS_PER_IP:
-            return scan_error_response(target.host, "rate_limited")
-        if not await scan_slots.acquire():
-            return scan_error_response(target.host, "rate_limited")
+        # Count this scan before waiting for a slot, so a burst cannot get past the cap.
         scans_in_flight[client_ip] = scans_in_flight.get(client_ip, 0) + 1
+        got_slot = False
         try:
+            if scans_in_flight[client_ip] > MAX_SCANS_PER_IP:
+                return scan_error_response(target.host, "rate_limited")
+            got_slot = await scan_slots.acquire()
+            if not got_slot:
+                return scan_error_response(target.host, "rate_limited")
             probe = await run_probe()
         except asyncio.TimeoutError:
             return failed(target.host, "timeout")
         except ScanError as e:
             return failed(target.host, e.code)
         finally:
-            scan_slots.release()
+            if got_slot:
+                scan_slots.release()
             scans_in_flight[client_ip] -= 1
             if not scans_in_flight[client_ip]:
                 del scans_in_flight[client_ip]
@@ -202,7 +217,7 @@ async def practice_mode(body: ModeRequest, request: Request):
         log.error("practice restart failed: %s", e)
         return JSONResponse({"error": {"code": "internal", "message":
                                        "The practice server could not restart. Try again."}},
-                            status_code=503)
+                            status_code=500)
     return {"mode": mode}
 
 

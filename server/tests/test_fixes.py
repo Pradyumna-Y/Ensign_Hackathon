@@ -70,6 +70,8 @@ def test_tls13_failure_is_retried_without_the_hybrid_share(monkeypatch):
     assert result["handshake"]["supportsTls13"] is True
     assert result["handshake"]["keyExchange"] == "classical"
     assert ("-tls1_3", tuple(scanner.FALLBACK_GROUPS)) in calls
+    # the screen must not claim we offered hybrid groups when the retry did not
+    assert result["handshake"]["weOffered"] == scanner.FALLBACK_GROUPS
 
 
 def test_tls12_timeout_is_retried_once(monkeypatch):
@@ -109,7 +111,8 @@ def valid_saved(host="cloudflare.com"):
             "handshake": {"keyExchange": "classical", "supportsTls13": True,
                           "acceptsTls12": False, "serverPicked": "X25519",
                           "weOffered": ["X25519"]},
-            "verdict": {}, "shelfLife": {}, "certificate": None}
+            "verdict": {"label": "not_ready", "score": 35}, "shelfLife": {"years": 30},
+            "certificate": None}
 
 
 def test_damaged_saved_files_are_ignored(monkeypatch, tmp_path):
@@ -127,3 +130,13 @@ def test_cache_write_failure_does_not_raise(monkeypatch, tmp_path):
     blocker.write_text("x")
     monkeypatch.setattr(cache, "CACHE_DIR", blocker / "cache")
     assert cache.save(valid_saved()) is False
+
+
+def test_damaged_saved_values_are_ignored(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path)
+    for change in ({"scannedAt": "garbage"},
+                   {"handshake": {**valid_saved()["handshake"], "weOffered": None}},
+                   {"verdict": {}}, {"shelfLife": {}}):
+        (tmp_path / "cloudflare.com.json").write_text(
+            json.dumps({**valid_saved(), **change}), encoding="utf-8")
+        assert cache.load("cloudflare.com") is None

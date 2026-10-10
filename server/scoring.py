@@ -39,9 +39,9 @@ def _headline_and_reason(handshake):
     group = handshake["serverPicked"]
     if kx == "hybrid_pq":
         method = group or "a hybrid method"
-        return ("Up-to-date browsers connect to this site with hybrid post-quantum key exchange.",
-                f"Our scanner and the site agreed on its key using {method}, "
-                "a hybrid post-quantum method. Other clients may differ.")
+        return ("Our scanner connected to this site using hybrid post-quantum key exchange.",
+                f"The site picked {method}, a hybrid post-quantum method. "
+                "Other clients and older TLS versions may differ.")
     if kx == "classical":
         method = group or "a classical method"
         if handshake["supportsTls13"]:

@@ -47,6 +47,8 @@ export function practiceView(renderResult) {
       mode = state.mode; updateMode();
       status.innerHTML = loading();
       current = await api.scan(state.scanHost);
+      mode = current.handshake.keyExchange === 'hybrid_pq' ? 'hybrid' : 'classical';
+      updateMode();   // trust the scan, not a status read taken during a restart
       show(null, current);
       initialized = true;
       status.textContent = `Current connection: ${label(current)}, ${current.verdict.score} out of 100.`;
@@ -77,6 +79,9 @@ export function practiceView(renderResult) {
     } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus({preventScroll: true}); }
   }
   button.addEventListener('click', flip);
-  root.querySelector('.mode-labels').addEventListener('click', flip);
+  // Clicking a label picks that mode; clicking the track flips it.
+  root.querySelectorAll('[data-mode]').forEach(el =>
+    el.addEventListener('click', () => { if (el.dataset.mode !== mode) flip(); }));
+  root.querySelector('.mode-track').addEventListener('click', flip);
   return {load, isInitialized: () => initialized || busy};
 }

@@ -5,7 +5,7 @@ const delay = () => new Promise(resolve => setTimeout(resolve, 600 + Math.random
 // Parse error JSON even for 4xx and 5xx responses.
 async function request(url, options = {}, retries = 0) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 40000);
   try {
     const response = await fetch(url, {...options, signal: controller.signal});
     let body;
@@ -37,7 +37,7 @@ async function fixture(name) {
 
 export function normalizeHost(value) {
   return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0]
-    .replace(/^.*@/, '').replace(/:\d+$/, '').toLowerCase();
+    .replace(/^.*@/, '').toLowerCase();
 }
 
 export async function scan(host, data = 'health_records', years = 30) {

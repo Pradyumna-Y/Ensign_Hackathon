@@ -89,7 +89,8 @@ docker run --rm -p 8000:8000 -v "$PWD/cache:/app/cache" flip-the-lock
 ```
 
 The `-v` option shares the `cache/` folder (see "Saved results" below) so
-saved results survive restarts. Open http://localhost:8000.
+saved results survive restarts. Create it first (`mkdir cache`); on Linux add
+`--user "$(id -u):$(id -g)"` to `docker run` so the container can write to it. Open http://localhost:8000.
 
 If the app sits behind a proxy, start uvicorn with
 `--forwarded-allow-ips=<proxy address>`, or every visitor shares one rate
@@ -164,7 +165,7 @@ security-sensitive surface:
   rebinding).
 - Port 443 only. The reserved name `practice` maps to our own practice
   server and is the only way to reach a local port.
-- 8 second timeout per handshake, 20 seconds per scan, output size capped.
+- 8 second timeout per handshake, 20 seconds for the scan itself, output size capped.
 - At most 6 scans at once (3 per client), and about 30 scans per minute per
   client IP (HTTP 429 after that). The practice server has its own, larger
   limit so flipping it cannot be locked out by outside scans.

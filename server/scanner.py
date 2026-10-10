@@ -299,6 +299,7 @@ async def probe_site(openssl, host, ip, port=443):
 
     Returns {"handshake": {...}, "certificate": {...}} or raises ScanError.
     """
+    offered = OFFERED_GROUPS   # what the successful TLS 1.3 attempt really offered
     raw13, raw12 = await asyncio.gather(
         run_s_client(openssl, ip, host, port, "-tls1_3", OFFERED_GROUPS),
         run_s_client(openssl, ip, host, port, "-tls1_2"),
@@ -319,6 +320,7 @@ async def probe_site(openssl, host, ip, port=443):
         )
         if retry13 and parse_s_client(again13).ok:
             tls13 = parse_s_client(again13)
+            offered = FALLBACK_GROUPS   # the retry did not offer a hybrid group
         if retry12 and parse_s_client(again12).ok:
             tls12 = parse_s_client(again12)
 
@@ -332,7 +334,7 @@ async def probe_site(openssl, host, ip, port=443):
         "handshake": {
             "tlsVersion": main.protocol,
             "cipherSuite": main.cipher,
-            "weOffered": list(OFFERED_GROUPS),
+            "weOffered": list(offered),
             "serverPicked": main.group,
             "keyExchange": classify(tls13, tls12),
             "supportsTls13": tls13.ok,
