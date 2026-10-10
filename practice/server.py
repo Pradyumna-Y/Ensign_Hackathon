@@ -92,7 +92,8 @@ class PracticeServer:
         # If something else already holds the port (say a leftover s_server
         # from a crashed run), we would be checking the wrong server.
         if await wait_for_port(self.host, self.port, timeout=0):
-            raise RuntimeError(f"port {self.port} is already in use; stop the old process")
+            raise RuntimeError(f"port {self.port} is already in use; stop the old "
+                               "process or set PRACTICE_PORT to another port")
         self.proc = await asyncio.create_subprocess_exec(
             self.openssl, "s_server",
             "-accept", f"{self.host}:{self.port}",
@@ -114,12 +115,20 @@ class PracticeServer:
             self.proc.kill()
             await self.proc.wait()
         self.proc = None
+        self.mode = None   # nothing is running, so do not report an old mode
+
+    @property
+    def running(self):
+        """True while our own s_server process is alive."""
+        return self.proc is not None and self.proc.returncode is None
 
     async def set_mode(self, mode):
         """Really restart s_server with the group list for `mode`."""
         if mode not in MODES:
             raise ValueError(mode)
         async with self.lock:
+            if mode == self.mode and self.proc and self.proc.returncode is None:
+                return self.mode   # already in this mode: no pointless restart
             await self._stop()
             await self._start(mode)
         return self.mode

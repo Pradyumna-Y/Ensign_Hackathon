@@ -27,6 +27,8 @@ from server.errors import ScanError
 PRACTICE_HOST = "practice"
 PRACTICE_PORT = int(os.environ.get("PRACTICE_PORT", "8443"))
 DNS_TIMEOUT = 5
+MAX_DNS_LOOKUPS = 8   # lookups still running count, even after we stopped waiting
+_dns_gate = asyncio.Semaphore(MAX_DNS_LOOKUPS)
 
 # One DNS label: letters, digits and hyphens, 1 to 63 chars, no hyphen at either end.
 LABEL = r"(?!-)[a-z0-9-]{1,63}(?<!-)"
@@ -53,6 +55,11 @@ def normalize_host(raw):
     if not isinstance(raw, str):
         raise ScanError("invalid_host")
     host = raw.strip().lower()
+    if host and not host.isascii():   # an international name: use its ASCII form
+        try:
+            host = host.encode("idna").decode("ascii")
+        except UnicodeError:
+            raise ScanError("invalid_host")
     if host.endswith("."):
         host = host[:-1]   # "example.com." is the same name as "example.com"
     if host == PRACTICE_HOST:
@@ -89,8 +96,25 @@ async def resolve_target(raw_host):
 
     loop = asyncio.get_running_loop()
     try:
-        infos = await asyncio.wait_for(
-            loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM), DNS_TIMEOUT)
+        await asyncio.wait_for(_dns_gate.acquire(), DNS_TIMEOUT)
+    except asyncio.TimeoutError:
+        raise ScanError("rate_limited")
+    try:
+        lookup = asyncio.ensure_future(loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
+    except BaseException:
+        _dns_gate.release()
+        raise
+
+    def lookup_finished(done):
+        # A lookup keeps its thread until the resolver answers, even after we
+        # stop waiting, so the slot is only freed here.
+        _dns_gate.release()
+        if not done.cancelled():
+            done.exception()   # mark any error as seen
+
+    lookup.add_done_callback(lookup_finished)
+    try:
+        infos = await asyncio.wait_for(asyncio.shield(lookup), DNS_TIMEOUT)
     except (socket.gaierror, asyncio.TimeoutError, UnicodeError):
         raise ScanError("dns_failed")
     addresses = list(dict.fromkeys(info[4][0] for info in infos))

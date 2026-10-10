@@ -5,7 +5,7 @@ const delay = () => new Promise(resolve => setTimeout(resolve, 600 + Math.random
 // Parse error JSON even for 4xx and 5xx responses.
 async function request(url, options = {}, retries = 0) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 40000);
   try {
     const response = await fetch(url, {...options, signal: controller.signal});
     let body;
@@ -36,7 +36,8 @@ async function fixture(name) {
 }
 
 export function normalizeHost(value) {
-  return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0].toLowerCase();
+  return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0]
+    .replace(/^.*@/, '').toLowerCase();
 }
 
 export async function scan(host, data = 'health_records', years = 30) {
@@ -48,6 +49,7 @@ export async function scan(host, data = 'health_records', years = 30) {
     : host === 'cached.example' ? 'cached-ready' : 'not-ready';
   const result = await fixture(name);
   result.host = host;
+  result.source = 'sample';   // never shown as a live scan
   // Only mock data is adapted. Live results are never rescored or rewritten.
   const now = new Date().getFullYear();
   result.shelfLife = {...result.shelfLife, dataType: data, years: Number(years), secretUntilYear: now + Number(years)};

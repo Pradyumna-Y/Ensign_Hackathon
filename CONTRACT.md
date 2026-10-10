@@ -16,7 +16,8 @@ The headline demo, "Flip the Lock": a practice server we control. The judge swit
 - Labels are "Ready" and "Not ready yet". We never say "secure", "insecure", "safe", "unsafe" or "hacked".
 - Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.
 - We cannot see databases, passwords, or anything behind the connection.
-- Certificates are shown for context but not scored. They matter for impersonation later, not for recorded traffic.
+- Certificates are shown for context but not scored. With an ephemeral key exchange, a stolen certificate key alone cannot decrypt recorded traffic. Static RSA key exchange is the exception. We also show whether the certificate matches the name and chains to a trusted authority, for context only; it never changes the score.
+- "Ready" means our scanner negotiated a hybrid group on this one connection. Other clients, older TLS versions and other servers behind the same name may differ.
 - The year quantum computers arrive is an assumption. We use 2040 and say so on screen. Estimates vary.
 - Live results are labeled "Live scan". Saved results are labeled "Saved result from <time>". Never present a saved result as live.
 
@@ -73,20 +74,27 @@ Returns a ScanResult:
     "serverPicked": "X25519MLKEM768",
     "keyExchange": "hybrid_pq",
     "supportsTls13": true,
-    "acceptsTls12": true
+    "acceptsTls12": true,
+    "limits": [],
+    "evidence": {
+      "command": "openssl s_client -connect example.com:443 -servername example.com -tls1_3 -groups X25519MLKEM768:...",
+      "lines": ["Protocol: TLSv1.3", "Negotiated TLS1.3 group: X25519MLKEM768", "New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384"]
+    }
   },
   "certificate": {
     "keyType": "ECDSA",
     "keyBits": 256,
     "signature": "ecdsa-with-SHA256",
     "expires": "2027-01-04",
+    "verified": true,
+    "verifyNote": "The certificate matches this name and chains to a trusted authority.",
     "note": "Shown for context. Not scored."
   },
   "verdict": {
     "label": "ready",
     "score": 95,
-    "headline": "Recorded traffic to this site is protected against future quantum attacks.",
-    "reason": "The site agreed on its key using a hybrid post-quantum method.",
+    "headline": "Our scanner connected to this site using hybrid post-quantum key exchange.",
+    "reason": "The site picked X25519MLKEM768, a hybrid post-quantum method. Other clients and older TLS versions may differ.",
     "harvestWindowOpen": false,
     "fixes": [
       {
@@ -140,7 +148,7 @@ Returns `{ "ok": true, "opensslVersion": "3.5.x", "hybridSelfTest": true }`.
 
 ### Limits the frontend must respect
 
-- At most 4 scans in flight at once.
+- At most 6 scans run at once across all visitors, and 3 per visitor. The practice server has its own, larger limit.
 - HTTP 429 means wait a few seconds and retry; show a friendly message.
 
 ## Demo script (both of us build toward this)
@@ -154,9 +162,10 @@ Returns `{ "ok": true, "opensslVersion": "3.5.x", "hybridSelfTest": true }`.
 - By about 1 AM: A has real scans coming back from /api/scan with scoring. B has the scan and verdict screens finished on mock fixtures.
 - By about 3 AM: practice server and toggle work. B's Flip the lock panel works against the real API. Then sleep. A tired team ships bugs.
 - Sat 7:30 AM: seed the cache, full integration pass, polish.
-- Sat 10:00 AM: feature freeze. Only bug fixes after this.
-- Sat 10:00 to 11:30 AM: rehearse the demo, record a 45 to 60 second backup screen recording, final checks.
-- Sat 11:30 AM: final push and submit. Build ends at 12:00 PM.
+- Sat 8:30 AM: feature freeze. Only bug fixes after this.
+- Sat 8:30 to 9:00 AM: write the abstract, finish the README, final checks.
+- Sat 9:15 AM: submit on Devpost. The submission period closes Sat 10:00 AM MDT.
+- After submitting: rehearse the demo and record a 45 to 60 second backup screen recording.
 
 ## Cut order if time runs short
 

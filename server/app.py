@@ -21,7 +21,8 @@ from typing import Literal
 from practice.server import PracticeServer
 from server import cache, scoring
 from server.errors import HTTP_STATUS, MESSAGES, ScanError
-from server.limits import RateLimiter, ScanSlots
+from server.limits import (MAX_SCANS_PER_IP, PRACTICE_PER_MINUTE, RateLimiter,
+                           ScanSlots)
 from server.results import error_result, ok_result
 from server.scanner import find_openssl, hybrid_self_test, probe_site
 from server.targets import normalize_host, resolve_target
@@ -44,16 +45,51 @@ async def lifespan(app):
 
     # The practice server always starts on the old method.
     app.state.practice = PracticeServer(app.state.openssl)
-    await app.state.practice.set_mode("classical")
     try:
+        try:
+            await app.state.practice.set_mode("classical")
+        except RuntimeError as e:
+            # Real scans still work without it, so say what is wrong and carry on.
+            log.error("practice server unavailable: %s", e)
         yield
     finally:
         await app.state.practice.close()
 
 
 app = FastAPI(title="Flip the Lock", lifespan=lifespan, docs_url=None, redoc_url=None)
+
+# The page loads only its own scripts, its own API, and Google Fonts. Inline
+# styles are allowed because the page sets a few style attributes itself.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'")
+
+
+def with_safe_headers(response, path):
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    # Results must never be replayed from a cache, and the page files are
+    # re-checked on every load so an update is never hidden by an old copy.
+    response.headers["Cache-Control"] = "no-store" if path.startswith("/api/") else "no-cache"
+    return response
+
+
+@app.middleware("http")
+async def add_headers(request, call_next):
+    return with_safe_headers(await call_next(request), request.url.path)
+
 rate_limiter = RateLimiter()
+practice_limiter = RateLimiter(limit=PRACTICE_PER_MINUTE)   # flips and practice scans
 scan_slots = ScanSlots()
+scans_in_flight = {}   # client IP -> scans running now
+
+
+PRACTICE_DOWN_MESSAGE = ("The practice server is not running. "
+                         "Press Reset to the old lock to start it again.")
 
 
 def scan_error_response(host, code, message=None):
@@ -66,8 +102,10 @@ def scan_error_response(host, code, message=None):
 @app.exception_handler(Exception)
 async def on_unexpected(request, exc):
     log.exception("unhandled error")
-    return JSONResponse({"error": {"code": "internal", "message": "Something went wrong "
-                                   "on our side. Try again."}}, status_code=500)
+    return with_safe_headers(
+        JSONResponse({"error": {"code": "internal", "message": "Something went wrong "
+                                "on our side. Try again."}}, status_code=500),
+        request.url.path)
 
 
 @app.exception_handler(RequestValidationError)
@@ -103,7 +141,11 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
         return scan_error_response(shown_host, "invalid_input")
 
     client_ip = request.client.host if request.client else "unknown"
-    if not rate_limiter.allow(client_ip):
+    try:
+        is_practice = normalize_host(shown_host) == "practice"   # also "Practice." etc.
+    except ScanError:
+        is_practice = False
+    if not (practice_limiter if is_practice else rate_limiter).allow(client_ip):
         return scan_error_response(shown_host, "rate_limited")
 
     def failed(name, code):
@@ -122,18 +164,53 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
             return failed(normalize_host(host), e.code)
         return scan_error_response(shown_host, e.code)
 
-    if not await scan_slots.acquire():
-        return scan_error_response(target.host, "rate_limited")
-    try:
-        probe = await asyncio.wait_for(
+    async def run_probe():
+        return await asyncio.wait_for(
             probe_site(request.app.state.openssl, target.host, target.ip, target.port),
             TOTAL_SCAN_TIMEOUT)
-    except asyncio.TimeoutError:
-        return failed(target.host, "timeout")
-    except ScanError as e:
-        return failed(target.host, e.code)
-    finally:
-        scan_slots.release()
+
+    if is_practice:
+        # The local practice server skips the shared scan slots, so a busy
+        # outside scanner cannot block the demo. It waits for any restart in
+        # progress (inside the same deadline), so a scan never lands on a
+        # half-restarted server, and never scans something else on its port.
+        practice = request.app.state.practice
+
+        async def practice_scan():
+            async with practice.lock:
+                if not practice.running:
+                    raise ScanError("no_tls")   # reported with the practice-specific message
+                return await probe_site(request.app.state.openssl, target.host,
+                                        target.ip, target.port)
+        try:
+            probe = await asyncio.wait_for(practice_scan(), TOTAL_SCAN_TIMEOUT)
+        except asyncio.TimeoutError:
+            return scan_error_response(target.host, "timeout")
+        except ScanError as e:
+            if not practice.running:
+                return scan_error_response(target.host, "no_tls", PRACTICE_DOWN_MESSAGE)
+            return scan_error_response(target.host, e.code)
+    else:
+        # Count this scan before waiting for a slot, so a burst cannot get past the cap.
+        scans_in_flight[client_ip] = scans_in_flight.get(client_ip, 0) + 1
+        got_slot = False
+        try:
+            if scans_in_flight[client_ip] > MAX_SCANS_PER_IP:
+                return scan_error_response(target.host, "rate_limited")
+            got_slot = await scan_slots.acquire()
+            if not got_slot:
+                return scan_error_response(target.host, "rate_limited")
+            probe = await run_probe()
+        except asyncio.TimeoutError:
+            return failed(target.host, "timeout")
+        except ScanError as e:
+            return failed(target.host, e.code)
+        finally:
+            if got_slot:
+                scan_slots.release()
+            scans_in_flight[client_ip] -= 1
+            if not scans_in_flight[client_ip]:
+                del scans_in_flight[client_ip]
 
     result = ok_result(target.host, probe, data, years_int)
     cache.save(result)   # keeps demo sites' saved results fresh; ignores other hosts
@@ -152,7 +229,21 @@ async def demo_sites():
 
 @app.get("/api/practice")
 async def practice_status(request: Request):
-    return {"mode": request.app.state.practice.mode, "scanHost": "practice"}
+    # "mode" is null while the practice server is not running. Wait briefly for
+    # a restart in progress, so a reader does not see the gap between modes.
+    practice = request.app.state.practice
+
+    def current():   # a dead process has no mode, whatever it was before
+        return practice.mode if practice.running else None
+
+    try:
+        await asyncio.wait_for(practice.lock.acquire(), 1)
+    except asyncio.TimeoutError:
+        return {"mode": current(), "scanHost": "practice"}
+    try:
+        return {"mode": current(), "scanHost": "practice"}
+    finally:
+        practice.lock.release()
 
 
 class ModeRequest(BaseModel):
@@ -163,10 +254,16 @@ class ModeRequest(BaseModel):
 async def practice_mode(body: ModeRequest, request: Request):
     """Really stop and restart the practice server with the other group list."""
     client_ip = request.client.host if request.client else "unknown"
-    if not rate_limiter.allow(client_ip):
+    if not practice_limiter.allow(client_ip):
         return JSONResponse({"error": {"code": "rate_limited",
                                        "message": MESSAGES["rate_limited"]}}, status_code=429)
-    mode = await request.app.state.practice.set_mode(body.mode)
+    try:
+        mode = await request.app.state.practice.set_mode(body.mode)
+    except RuntimeError as e:
+        log.error("practice restart failed: %s", e)
+        return JSONResponse({"error": {"code": "internal", "message":
+                                       "The practice server could not restart. Try again."}},
+                            status_code=500)
     return {"mode": mode}
 
 

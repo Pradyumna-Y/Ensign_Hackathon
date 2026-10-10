@@ -1,5 +1,7 @@
 """API tests with the network parts replaced, so they run offline and fast."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -45,9 +47,16 @@ def client(monkeypatch, tmp_path):
     class FakePractice:
         def __init__(self, openssl):
             self.mode = None
+            self.alive = False
+            self.lock = asyncio.Lock()
+
+        @property
+        def running(self):
+            return self.alive
 
         async def set_mode(self, mode):
             self.mode = mode
+            self.alive = True
             return mode
 
         async def close(self):
@@ -59,6 +68,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(app_module, "resolve_target", resolve)
     monkeypatch.setattr(app_module, "probe_site", probe)
     monkeypatch.setattr(app_module, "rate_limiter", RateLimiter())
+    monkeypatch.setattr(app_module, "practice_limiter", RateLimiter(limit=120))
     with TestClient(app_module.app, raise_server_exceptions=False) as c:
         yield c
 
@@ -167,3 +177,59 @@ def test_no_saved_result_means_error(client):
     finally:
         OFFLINE.discard("wikipedia.org")
     assert error_of(r) == (200, "timeout")
+
+
+def test_practice_has_its_own_rate_limit(client):
+    for _ in range(31):
+        client.get("/api/scan", params={"host": "cloudflare.com"})
+    # outside scans are now limited, but flipping and scanning practice still work
+    assert client.get("/api/scan", params={"host": "cloudflare.com"}).status_code == 429
+    assert client.post("/api/practice/mode", json={"mode": "hybrid"}).status_code == 200
+    r = client.get("/api/scan", params={"host": "practice"})
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+
+
+def test_failed_practice_restart_is_a_clean_error(client, monkeypatch):
+    async def broken(mode):
+        raise RuntimeError("port 8443 is already in use")
+    monkeypatch.setattr(client.app.state.practice, "set_mode", broken)
+    r = client.post("/api/practice/mode", json={"mode": "hybrid"})
+    assert r.status_code == 500 and r.json()["error"]["code"] == "internal"
+    assert "8443" not in r.text
+
+
+def test_practice_scan_refuses_when_our_server_is_not_running(client):
+    client.app.state.practice.alive = False   # e.g. its port was taken at startup
+    for host in ("practice", "Practice."):
+        r = client.get("/api/scan", params={"host": host})
+        assert error_of(r) == (200, "no_tls")
+
+
+def test_practice_name_variants_use_the_practice_limit(client):
+    for _ in range(40):
+        assert client.get("/api/scan", params={"host": "Practice."}).status_code == 200
+
+
+def test_security_headers_and_cache_rules(client):
+    api = client.get("/api/health")
+    assert api.headers["Cache-Control"] == "no-store"
+    page = client.get("/")
+    assert page.headers["Cache-Control"] == "no-cache"
+    for r in (api, page):
+        assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+        assert r.headers["X-Content-Type-Options"] == "nosniff"
+        assert r.headers["Referrer-Policy"] == "no-referrer"
+    assert "script-src 'self'" in page.headers["Content-Security-Policy"]
+
+
+def test_unexpected_error_still_carries_the_safe_headers(client):
+    r = client.get("/api/scan", params={"host": "boom.example"})
+    assert r.status_code == 500
+    assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
+    assert r.headers["Cache-Control"] == "no-store"
+
+
+def test_practice_status_is_null_when_the_server_is_not_running(client):
+    practice = client.app.state.practice
+    practice.mode, practice.alive = "classical", False   # the process died; mode is stale
+    assert client.get("/api/practice").json()["mode"] is None
