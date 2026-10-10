@@ -5,7 +5,7 @@ export function practiceView(renderResult) {
   const root = document.querySelector('#flip-view');
   root.innerHTML = `<div class="intro flip-intro"><p class="eyebrow"><span aria-hidden="true"></span>See the difference, one switch at a time</p><h1 id="flip-title">Same server.<br><span class="muted-title">A different lock.</span></h1><p class="intro-description">The practice server is ours, and this switch really changes how it agrees on keys.</p><p id="practice-mock" ${api.mock ? '' : 'hidden'}>In this mock demo, the switch alternates sample results instead of restarting a server.</p></div>
     <div class="flip-controls"><div><p class="control-caption">Practice server key exchange</p><div class="mode-labels"><span data-mode="classical">Old lock</span><span class="mode-track" aria-hidden="true"><i></i></span><span data-mode="hybrid">New lock</span></div></div><button id="flip-button" class="primary" type="button" role="switch" aria-label="New lock" aria-checked="false" disabled>Load practice server</button></div>
-    <p class="reset-row"><button id="reset-button" class="secondary" type="button">Reset to the old lock</button><span class="hint">Press this before you show someone the demo, so it starts from the old lock.</span></p>
+    <p class="reset-row"><button id="reset-button" class="secondary" type="button">Reset to the old lock</button></p>
     <div id="flip-status" class="status" role="status" aria-live="polite"></div><div id="comparison" class="compare single"></div>`;
   const status = root.querySelector('#flip-status');
   const button = root.querySelector('#flip-button');
