@@ -88,7 +88,8 @@ async function loadExamples() {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'chip'; button.textContent = host;
       button.addEventListener('click', () => {
-        $('#host').value = host; $('#host').focus();
+        $('#host').value = host;
+        runScan();   // one click is enough for an example
       });
       $(index < 3 ? '#demo-sites' : '#demo-more').append(button);
     }

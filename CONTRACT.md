@@ -74,7 +74,12 @@ Returns a ScanResult:
     "serverPicked": "X25519MLKEM768",
     "keyExchange": "hybrid_pq",
     "supportsTls13": true,
-    "acceptsTls12": true
+    "acceptsTls12": true,
+    "limits": [],
+    "evidence": {
+      "command": "openssl s_client -connect example.com:443 -servername example.com -tls1_3 -groups X25519MLKEM768:...",
+      "lines": ["Protocol: TLSv1.3", "Negotiated TLS1.3 group: X25519MLKEM768", "New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384"]
+    }
   },
   "certificate": {
     "keyType": "ECDSA",

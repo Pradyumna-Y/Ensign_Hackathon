@@ -16,6 +16,7 @@ from server.targets import is_blocked, normalize_host, resolve_target
     ("example.com.", "example.com"),
     ("example.com\n", "example.com"),   # pasted with a newline
     ("xn--bcher-kva.example", "xn--bcher-kva.example"),
+    ("bücher.example", "xn--bcher-kva.example"),   # international names become ASCII
     ("practice", "practice"),
 ])
 def test_valid_hostnames(raw, expected):
@@ -27,7 +28,7 @@ def test_valid_hostnames(raw, expected):
     "127.0.0.1", "10.1", "0x7f.0.0.0x1", "1.2.3.4.5", "::1", "[::1]", "[2606:4700::1]",
     "example.com:8443", "example.com:443", "example.com/path", "https://example.com",
     "exa mple.com", "exa\tmple.com", "example.com\nevil.com", "-bad.com", "bad-.com", "example..com",
-    "ex_ample.com", "exämple.com", "a" * 64 + ".com", ("a" * 60 + ".") * 5 + "com",
+    "ex_ample.com", "ex\u202eample.com", "a" * 64 + ".com", ("a" * 60 + ".") * 5 + "com",
     "user@example.com", "example.com;ls", "$(whoami).com",
 ])
 def test_invalid_hostnames(raw):
@@ -98,3 +99,8 @@ def test_practice_is_the_only_local_target(monkeypatch):
     fake_dns(monkeypatch, None)   # no DNS lookup happens for "practice"
     t = run(resolve_target("practice"))
     assert (t.ip, t.port) == ("127.0.0.1", targets.PRACTICE_PORT)
+
+
+@pytest.mark.parametrize("ip", ["64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::808:808"])
+def test_nat64_addresses_are_refused(ip):
+    assert is_blocked(ip)   # even a public IPv4 inside is refused: we play it safe

@@ -1,5 +1,5 @@
 import * as api from './api.js';
-import {label, errorView, loading} from './views.js';
+import {label, errorView, loading, escape} from './views.js';
 
 export function practiceView(renderResult) {
   const root = document.querySelector('#flip-view');
@@ -27,7 +27,9 @@ export function practiceView(renderResult) {
   }
   function show(before, after, animate = false) {
     comparison.className = `compare ${before ? '' : 'single'}`;
-    comparison.innerHTML = `${before ? '<section><h2>Before</h2><div id="before-result"></div></section>' : ''}<section><h2>${before ? 'After' : 'Current connection'}</h2><div id="after-result"></div></section>`;
+    const tone = r => r.verdict.label === 'ready' ? 'good' : 'bad';
+    const banner = before ? `<div class="flip-banner"><div class="fb-side"><span class="fb-num ${tone(before)}">${escape(before.verdict.score)}</span><span class="fb-cap">Before: ${escape(label(before))}</span></div><span class="fb-arrow" aria-hidden="true">→</span><div class="fb-side"><span class="fb-num ${tone(after)}">${escape(after.verdict.score)}</span><span class="fb-cap">After: ${escape(label(after))}</span></div><p class="fb-text">Same server. It was really stopped and restarted with a different key exchange.</p></div>` : '';
+    comparison.innerHTML = `${banner}${before ? '<section><h2>Before</h2><div id="before-result"></div></section>' : ''}<section><h2>${before ? 'After' : 'Current connection'}</h2><div id="after-result"></div></section>`;
     if (before) renderResult(root.querySelector('#before-result'), before);
     const target = root.querySelector('#after-result');
     renderResult(target, after);

@@ -83,6 +83,12 @@ PY
 PORT="$(free_port "${PORT:-8000}")"
 export PRACTICE_PORT="$(free_port "${PRACTICE_PORT:-8443}" "$PORT")"
 
+# First run: save results for the demo sites in the background, so the offline
+# fallback works even if the network is slow later.
+if [[ ! -d cache ]]; then
+    ( venv/bin/python scripts/seed_cache.py >/dev/null 2>&1 & ) || true
+fi
+
 URL="http://127.0.0.1:$PORT"
 echo "OpenSSL: $OPENSSL_BIN ($("$OPENSSL_BIN" version | awk '{print $2}'))"
 echo "Open $URL   (practice server on port $PRACTICE_PORT; Ctrl+C to stop)"

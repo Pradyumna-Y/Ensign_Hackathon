@@ -162,3 +162,28 @@ def test_identity_unknown_when_no_verify_line():
     assert scanner.certificate_identity(None) == (None, "Identity was not checked.")
     verified, note = scanner.certificate_identity((99, "odd"))
     assert verified is False and "99" in note
+
+
+def test_probe_reports_its_evidence_and_limits(monkeypatch):
+    def behaviour(flag, groups, attempt):
+        if flag == "-tls1_3":
+            if groups == scanner.OFFERED_GROUPS:
+                return RawProbe("", timed_out=True)
+            return raw("tls13_classical_x25519_github")
+        return raw("tls12_ecdhe_cloudflare")
+    fake_s_client(monkeypatch, behaviour)
+    h = asyncio.run(scanner.probe_site("openssl", "x.example", "1.2.3.4"))["handshake"]
+    assert any("without the hybrid groups" in note for note in h["limits"])
+    assert h["evidence"]["command"].startswith("openssl s_client -connect x.example:443 ")
+    assert "-groups X25519:secp256r1:secp384r1" in h["evidence"]["command"]
+    assert any(line.startswith("Peer Temp Key") or line.startswith("Server Temp Key")
+               for line in h["evidence"]["lines"])
+
+
+def test_hybrid_evidence_names_the_server_pick(monkeypatch):
+    def behaviour(flag, groups, attempt):
+        return raw("tls13_hybrid_cloudflare") if flag == "-tls1_3" else raw("tls12_ecdhe_cloudflare")
+    fake_s_client(monkeypatch, behaviour)
+    h = asyncio.run(scanner.probe_site("openssl", "x.example", "1.2.3.4"))["handshake"]
+    assert "Negotiated TLS1.3 group: X25519MLKEM768" in h["evidence"]["lines"]
+    assert h["limits"] == []

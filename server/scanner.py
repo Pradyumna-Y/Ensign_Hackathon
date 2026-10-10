@@ -150,6 +150,7 @@ class Probe:
     cert_pem: str | None      # the server's own (leaf) certificate
     failure: str | None       # why it failed: timeout, connect_failed, not_tls, handshake_refused
     verify: tuple | None = None   # (OpenSSL verify code, text) for the certificate, if printed
+    evidence: tuple = ()          # the s_client lines the verdict was read from
 
 
 NEW_LINE = re.compile(r"^New, (\S+), Cipher is (\S+)", re.M)
@@ -177,6 +178,16 @@ def _group_from_temp_key(value):
     else:
         name = parts[0]
     return CURVE_NAMES.get(name, name)
+
+
+def _evidence_lines(text):
+    """The few s_client lines the verdict comes from, so the page can show them."""
+    lines = []
+    for pattern in (PROTOCOL, NEGOTIATED, TEMP_KEY, NEW_LINE):
+        found = pattern.search(text)
+        if found and found[0].strip() not in lines:
+            lines.append(found[0].strip()[:90])
+    return tuple(lines)
 
 
 def parse_s_client(raw):
@@ -219,7 +230,8 @@ def parse_s_client(raw):
     verify = VERIFY.search(text) if ok else None
     return Probe(ok, protocol, cipher, group if ok else None,
                  pem[0] if (ok and pem) else None, failure,
-                 (int(verify[1]), verify[2]) if verify else None)
+                 (int(verify[1]), verify[2]) if verify else None,
+                 _evidence_lines(text) if ok else ())
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +375,17 @@ async def probe_site(openssl, host, ip, port=443):
         raise ScanError("no_tls")
 
     main = tls13 if tls13.ok else tls12
+    # Say plainly when the evidence is thinner than it looks.
+    limits = []
+    if tls13.ok and offered is FALLBACK_GROUPS:
+        limits.append("TLS 1.3 worked only after a retry without the hybrid groups, "
+                      "so hybrid support was not tested on this connection.")
+    if not tls13.ok and tls13.failure in ("timeout", "connect_failed"):
+        limits.append("The TLS 1.3 attempt timed out, so we cannot say TLS 1.3 is unsupported.")
+    if tls13.ok and not tls12.ok and tls12.failure in ("timeout", "connect_failed"):
+        limits.append("The TLS 1.2 attempt timed out, so we cannot say TLS 1.2 is refused.")
+    flag = "-tls1_3" if main is tls13 else "-tls1_2"
+    groups = f" -groups {':'.join(offered)}" if main is tls13 else ""
     return {
         "handshake": {
             "tlsVersion": main.protocol,
@@ -372,6 +395,12 @@ async def probe_site(openssl, host, ip, port=443):
             "keyExchange": classify(tls13, tls12),
             "supportsTls13": tls13.ok,
             "acceptsTls12": tls12.ok,
+            "limits": limits,
+            "evidence": {
+                "command": f"openssl s_client -connect {host}:{port} -servername {host} "
+                           f"{flag}{groups}",
+                "lines": list(main.evidence),
+            },
         },
         "certificate": _with_identity(parse_certificate(main.cert_pem), main.verify),
     }

@@ -12,6 +12,9 @@ import sys
 import urllib.error
 import urllib.request
 
+if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+    print(__doc__)
+    sys.exit(0)
 BASE = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 
 

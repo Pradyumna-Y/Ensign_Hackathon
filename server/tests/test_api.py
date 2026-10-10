@@ -225,3 +225,8 @@ def test_unexpected_error_still_carries_the_safe_headers(client):
     assert r.status_code == 500
     assert "frame-ancestors 'none'" in r.headers["Content-Security-Policy"]
     assert r.headers["Cache-Control"] == "no-store"
+
+
+def test_practice_status_is_null_when_the_server_is_not_running(client):
+    client.app.state.practice.mode = None
+    assert client.get("/api/practice").json()["mode"] is None

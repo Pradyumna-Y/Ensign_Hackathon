@@ -48,8 +48,8 @@ def _headline_and_reason(handshake):
             reason = (f"The site agreed on its key with {method}. Today's computers cannot "
                       "break that, but a future quantum computer could.")
         else:
-            reason = (f"The site only speaks TLS 1.2 and agreed on its key with {method}, "
-                      "which a future quantum computer could break.")
+            reason = (f"We only completed a TLS 1.2 connection, where the site agreed on "
+                      f"its key with {method}, which a future quantum computer could break.")
         return ("Recorded traffic to this site could be read once quantum computers arrive.",
                 reason)
     if kx == "static_rsa":

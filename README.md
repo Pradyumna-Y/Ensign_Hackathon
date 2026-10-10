@@ -50,6 +50,10 @@ steps are under "Running it" below.
   today. Static RSA key exchange is the exception. We also show whether the
   certificate matches the name and chains to a trusted authority, for context
   only; it never changes the score.
+- Every result can show its evidence: the exact `openssl s_client` command and
+  the lines OpenSSL printed that the verdict is read from. When a retry or a
+  timeout makes the evidence thinner, the result says so.
+- The 0 to 100 score is our own rubric, not a standard rating.
 - "Ready" means our scanner negotiated a hybrid group on this one connection.
   Other clients, older TLS versions, and other servers behind the same name
   may behave differently. A bare domain and its `www` name can differ.

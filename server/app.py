@@ -88,6 +88,10 @@ scan_slots = ScanSlots()
 scans_in_flight = {}   # client IP -> scans running now
 
 
+PRACTICE_DOWN_MESSAGE = ("The practice server is not running. "
+                         "Press Reset to the old lock to start it again.")
+
+
 def scan_error_response(host, code, message=None):
     return JSONResponse(error_result(host, code, message),
                         status_code=HTTP_STATUS.get(code, 200))
@@ -180,10 +184,8 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
                                         target.ip, target.port)
         try:
             probe = await asyncio.wait_for(practice_scan(), TOTAL_SCAN_TIMEOUT)
-        except asyncio.TimeoutError:
-            return failed(target.host, "timeout")
-        except ScanError as e:
-            return failed(target.host, e.code)
+        except (asyncio.TimeoutError, ScanError):
+            return scan_error_response(target.host, "no_tls", PRACTICE_DOWN_MESSAGE)
     else:
         # Count this scan before waiting for a slot, so a burst cannot get past the cap.
         scans_in_flight[client_ip] = scans_in_flight.get(client_ip, 0) + 1
@@ -226,12 +228,16 @@ async def practice_status(request: Request):
     # "mode" is null while the practice server is not running. Wait briefly for
     # a restart in progress, so a reader does not see the gap between modes.
     practice = request.app.state.practice
+
+    def current():   # a dead process has no mode, whatever it was before
+        return practice.mode if practice.running else None
+
     try:
         await asyncio.wait_for(practice.lock.acquire(), 1)
     except asyncio.TimeoutError:
-        return {"mode": practice.mode, "scanHost": "practice"}
+        return {"mode": current(), "scanHost": "practice"}
     try:
-        return {"mode": practice.mode, "scanHost": "practice"}
+        return {"mode": current(), "scanHost": "practice"}
     finally:
         practice.lock.release()
 

@@ -55,6 +55,11 @@ def normalize_host(raw):
     if not isinstance(raw, str):
         raise ScanError("invalid_host")
     host = raw.strip().lower()
+    if host and not host.isascii():   # an international name: use its ASCII form
+        try:
+            host = host.encode("idna").decode("ascii")
+        except UnicodeError:
+            raise ScanError("invalid_host")
     if host.endswith("."):
         host = host[:-1]   # "example.com." is the same name as "example.com"
     if host == PRACTICE_HOST:

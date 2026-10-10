@@ -108,6 +108,25 @@ input::placeholder { color: #647386; }
 .meter-fill { height: 100%; background: var(--verdict-color); width: var(--score); border-radius: 1px; }
 .threshold { position: absolute; left: 80%; height: 16px; top: -4px; border-left: 2px solid var(--ink); }
 .meter-caption { text-align: left; font-size: 11px; color: var(--muted); margin: 12px 0 24px; }
+.handshake-summary { border-top: 1px solid var(--line); padding: 24px 0 8px; }
+.handshake-summary p { margin: 0 0 12px; font-size: 12px; font-weight: 600; }
+.handshake-summary .offered-note { font-weight: 400; color: var(--muted); margin: 12px 0 0; }
+.tech { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.tech summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 44px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.tech summary::after { content: '+'; font-size: 20px; }
+.tech[open] summary::after { content: '\2212'; }
+.tech-label { margin: 16px 0 8px; font-size: 12px; font-weight: 600; }
+.tech pre { margin: 0 0 8px; padding: 14px 16px; background: var(--ink); color: #E6EDF5; border-radius: 5px; font: 12px/1.6 'JetBrains Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.limits { font-size: 12px; color: #7A4F00; background: #FFF6E5; border: 1px solid #F0D9A8; border-radius: 4px; padding: 10px 12px; margin: 12px 0 0; }
+.lede { font-weight: 600; color: var(--ink); }
+.flip-banner { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; background: white; border: 1px solid var(--line); border-radius: 7px; padding: 22px 26px; margin-top: 28px; }
+.fb-side { display: flex; flex-direction: column; align-items: center; }
+.fb-num { font-size: 56px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.fb-num.bad { color: #B3362D; }
+.fb-num.good { color: #12704F; }
+.fb-cap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.fb-arrow { font-size: 34px; color: #647386; }
+.fb-text { flex-basis: 100%; text-align: center; margin: 0; font-size: 14px; color: var(--muted); }
 .handshake { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 24px 0; display: grid; grid-template-columns: 1.5fr auto 1fr; gap: 24px; align-items: center; }
 .handshake > div { min-width: 0; }
 .handshake > span { color: #647386; font-size: 20px; }
