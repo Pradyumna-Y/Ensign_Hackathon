@@ -1,5 +1,6 @@
 import * as api from './api.js';
 import {escape, verdictView, source, label, errorView, loading} from './views.js';
+import {practiceView} from './practice.js';
 
 const $ = selector => document.querySelector(selector);
 const defaults = {health_records: 30, bank_records: 25, government_docs: 50, login_session: 0};
@@ -10,6 +11,7 @@ $('#mock-banner').hidden = !api.mock;
 function renderResult(target, result) {
   target.innerHTML = verdictView(result);
 }
+const flipPanel = practiceView(renderResult);
 
 async function offerSaved() {
   const target = $('#saved-results');
@@ -76,6 +78,7 @@ function route() {
   const flip = location.hash === '#flip';
   $('#scan-view').hidden = flip;
   $('#flip-view').hidden = !flip;
+  if (flip && !flipPanel.isInitialized()) flipPanel.load();
   document.querySelectorAll('nav a').forEach(a => {
     if (a.hash === (flip ? '#flip' : '#scan')) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
