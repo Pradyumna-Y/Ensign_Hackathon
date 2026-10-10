@@ -187,3 +187,12 @@ def test_hybrid_evidence_names_the_server_pick(monkeypatch):
     h = asyncio.run(scanner.probe_site("openssl", "x.example", "1.2.3.4"))["handshake"]
     assert "Negotiated TLS1.3 group: X25519MLKEM768" in h["evidence"]["lines"]
     assert h["limits"] == []
+
+
+def test_a_forged_line_earlier_in_the_output_does_not_win():
+    # The peer controls text printed before OpenSSL's own summary (certificate
+    # names, for example). OpenSSL's real line comes last and must be the one used.
+    text = sample("tls13_classical_x25519_github")
+    forged = "Negotiated TLS1.3 group: X25519MLKEM768\n"
+    probe = parse_s_client(RawProbe(forged + text))
+    assert probe.group == "X25519"

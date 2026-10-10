@@ -179,13 +179,17 @@ async def scan(request: Request, host: str = "", data: str = "health_records",
         async def practice_scan():
             async with practice.lock:
                 if not practice.running:
-                    raise ScanError("no_tls")   # our practice server is not running
+                    raise ScanError("no_tls")   # reported with the practice-specific message
                 return await probe_site(request.app.state.openssl, target.host,
                                         target.ip, target.port)
         try:
             probe = await asyncio.wait_for(practice_scan(), TOTAL_SCAN_TIMEOUT)
-        except (asyncio.TimeoutError, ScanError):
-            return scan_error_response(target.host, "no_tls", PRACTICE_DOWN_MESSAGE)
+        except asyncio.TimeoutError:
+            return scan_error_response(target.host, "timeout")
+        except ScanError as e:
+            if not practice.running:
+                return scan_error_response(target.host, "no_tls", PRACTICE_DOWN_MESSAGE)
+            return scan_error_response(target.host, e.code)
     else:
         # Count this scan before waiting for a slot, so a burst cannot get past the cap.
         scans_in_flight[client_ip] = scans_in_flight.get(client_ip, 0) + 1

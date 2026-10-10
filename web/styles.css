@@ -279,3 +279,4 @@ footer a { display: inline-flex; align-items: center; gap: 14px; text-decoration
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+@media (max-width: 480px) { .flip-banner { gap: 10px; padding: 18px 12px; } .fb-num { font-size: 46px; } .fb-arrow { font-size: 26px; } .fb-cap { font-size: 11px; text-align: center; } }

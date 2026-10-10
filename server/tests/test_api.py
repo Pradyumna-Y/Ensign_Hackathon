@@ -47,14 +47,16 @@ def client(monkeypatch, tmp_path):
     class FakePractice:
         def __init__(self, openssl):
             self.mode = None
+            self.alive = False
             self.lock = asyncio.Lock()
 
         @property
         def running(self):
-            return self.mode is not None
+            return self.alive
 
         async def set_mode(self, mode):
             self.mode = mode
+            self.alive = True
             return mode
 
         async def close(self):
@@ -197,7 +199,7 @@ def test_failed_practice_restart_is_a_clean_error(client, monkeypatch):
 
 
 def test_practice_scan_refuses_when_our_server_is_not_running(client):
-    client.app.state.practice.mode = None   # e.g. its port was taken at startup
+    client.app.state.practice.alive = False   # e.g. its port was taken at startup
     for host in ("practice", "Practice."):
         r = client.get("/api/scan", params={"host": host})
         assert error_of(r) == (200, "no_tls")
@@ -228,5 +230,6 @@ def test_unexpected_error_still_carries_the_safe_headers(client):
 
 
 def test_practice_status_is_null_when_the_server_is_not_running(client):
-    client.app.state.practice.mode = None
+    practice = client.app.state.practice
+    practice.mode, practice.alive = "classical", False   # the process died; mode is stale
     assert client.get("/api/practice").json()["mode"] is None

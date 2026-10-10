@@ -88,6 +88,7 @@ async function loadExamples() {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'chip'; button.textContent = host;
       button.addEventListener('click', () => {
+        if (scanBusy) return;
         $('#host').value = host;
         runScan();   // one click is enough for an example
       });

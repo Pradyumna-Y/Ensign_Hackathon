@@ -10,7 +10,7 @@ const isNew = group => /MLKEM|ML-KEM/i.test(group);
 function evidenceView(h) {
   const e = h.evidence;
   if (!e) return '<p class="tech-label">This is a saved result from before evidence was kept.</p>';
-  return `<p class="tech-label">Our scanner ran</p><pre><code>${escape(e.command)}</code></pre><p class="tech-label">and OpenSSL printed</p><pre><code>${(e.lines || []).map(escape).join('\n')}</code></pre>`;
+  return `<p class="tech-label">Our scanner ran (shortened: the real run connects to the address it checked)</p><pre><code>${escape(e.command)}</code></pre><p class="tech-label">and OpenSSL printed</p><pre><code>${(e.lines || []).map(escape).join('\n')}</code></pre>`;
 }
 function chip(group, picked = false) {
   const method = isNew(group) ? 'new method' : 'old method';
@@ -48,6 +48,7 @@ const errors = {
 export function errorView(error, practice = false) {
   const message = practice && error.code === 'unreachable'
     ? 'The practice server cannot be reached right now. Ask the team to restart it, then try again.'
+    : practice && error.code === 'no_tls' && error.message ? error.message
     : errors[error.code] || 'This request could not be completed. Try again.';
   return `<p>${escape(message)}</p><button class="secondary" type="button" data-retry>Try again</button>`;
 }

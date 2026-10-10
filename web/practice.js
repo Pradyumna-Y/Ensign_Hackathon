@@ -28,7 +28,7 @@ export function practiceView(renderResult) {
   function show(before, after, animate = false) {
     comparison.className = `compare ${before ? '' : 'single'}`;
     const tone = r => r.verdict.label === 'ready' ? 'good' : 'bad';
-    const banner = before ? `<div class="flip-banner"><div class="fb-side"><span class="fb-num ${tone(before)}">${escape(before.verdict.score)}</span><span class="fb-cap">Before: ${escape(label(before))}</span></div><span class="fb-arrow" aria-hidden="true">→</span><div class="fb-side"><span class="fb-num ${tone(after)}">${escape(after.verdict.score)}</span><span class="fb-cap">After: ${escape(label(after))}</span></div><p class="fb-text">Same server. It was really stopped and restarted with a different key exchange.</p></div>` : '';
+    const banner = before ? `<div class="flip-banner"><div class="fb-side"><span class="fb-num ${tone(before)}">${escape(before.verdict.score)}</span><span class="fb-cap">Before: ${escape(label(before))}</span></div><span class="fb-arrow" aria-hidden="true">→</span><div class="fb-side"><span class="fb-num ${tone(after)}">${escape(after.verdict.score)}</span><span class="fb-cap">After: ${escape(label(after))}</span></div><p class="fb-text">${api.mock ? 'Mock demo: this sample result changed. Nothing was restarted.' : 'Same server. It was really stopped and restarted with a different key exchange.'}</p></div>` : '';
     comparison.innerHTML = `${banner}${before ? '<section><h2>Before</h2><div id="before-result"></div></section>' : ''}<section><h2>${before ? 'After' : 'Current connection'}</h2><div id="after-result"></div></section>`;
     if (before) renderResult(root.querySelector('#before-result'), before);
     const target = root.querySelector('#after-result');
@@ -75,7 +75,7 @@ export function practiceView(renderResult) {
       current = await api.scan('practice');
       show(before, current, true);
       if (matchMedia('(max-width: 760px)').matches) {
-        root.querySelector('#after-result').scrollIntoView({block: 'start'});
+        root.querySelector('.flip-banner').scrollIntoView({block: 'start'});
       }
       status.textContent = `Before: ${label(before)}, ${before.verdict.score}. After: ${label(current)}, ${current.verdict.score}.`;
     } catch (error) {

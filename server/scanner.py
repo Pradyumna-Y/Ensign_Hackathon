@@ -180,11 +180,27 @@ def _group_from_temp_key(value):
     return CURVE_NAMES.get(name, name)
 
 
+def _summary(text):
+    """The part of the output OpenSSL writes itself, after the certificate chain.
+    The chain is where text the peer controls (names and so on) is printed."""
+    marker = "-----END CERTIFICATE-----"
+    start = text.rfind(marker)
+    return text[start + len(marker):] if start != -1 else text
+
+
+def _last(pattern, text):
+    """The last match in the text."""
+    found = None
+    for found in pattern.finditer(text):
+        pass
+    return found
+
+
 def _evidence_lines(text):
     """The few s_client lines the verdict comes from, so the page can show them."""
     lines = []
     for pattern in (PROTOCOL, NEGOTIATED, TEMP_KEY, NEW_LINE):
-        found = pattern.search(text)
+        found = _last(pattern, _summary(text))
         if found and found[0].strip() not in lines:
             lines.append(found[0].strip()[:90])
     return tuple(lines)
@@ -197,20 +213,21 @@ def parse_s_client(raw):
     text = raw.text.replace("\r\n", "\n")
 
     protocol = cipher = group = None
-    m = NEW_LINE.search(text)
+    summary = _summary(text)
+    m = _last(NEW_LINE, summary)
     if m and m[1] != "(NONE)" and m[2] != "(NONE)":
         protocol, cipher = m[1], m[2]
-        negotiated = PROTOCOL.search(text)
+        negotiated = _last(PROTOCOL, summary)
         if negotiated:
             protocol = negotiated[1]
 
     # OpenSSL 3.5 prints "Negotiated TLS1.3 group" for hybrid groups and
     # "Peer Temp Key" for classical ones, so we read both.
-    m = NEGOTIATED.search(text)
+    m = _last(NEGOTIATED, summary)
     if m and m[1] != "<NULL>":
         group = m[1]
     else:
-        m = TEMP_KEY.search(text)
+        m = _last(TEMP_KEY, summary)
         if m:
             group = _group_from_temp_key(m[1])
 

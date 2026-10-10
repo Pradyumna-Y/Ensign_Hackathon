@@ -85,8 +85,8 @@ export PRACTICE_PORT="$(free_port "${PRACTICE_PORT:-8443}" "$PORT")"
 
 # First run: save results for the demo sites in the background, so the offline
 # fallback works even if the network is slow later.
-if [[ ! -d cache ]]; then
-    ( venv/bin/python scripts/seed_cache.py >/dev/null 2>&1 & ) || true
+if [[ "$(ls cache/*.json 2>/dev/null | wc -l)" -lt 10 ]]; then
+    ( venv/bin/python scripts/seed_cache.py > venv/seed.log 2>&1 & ) || true
 fi
 
 URL="http://127.0.0.1:$PORT"
