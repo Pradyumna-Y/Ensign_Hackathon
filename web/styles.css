@@ -212,6 +212,11 @@ footer a { display: inline-flex; align-items: center; gap: 14px; text-decoration
   footer p { flex-basis: 100%; order: 2; }
   footer a { margin-left: auto; }
 }
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; gap: 18px; }
+  nav { width: 100%; }
+  nav a { flex: 1; text-align: center; }
+}
 @media (max-width: 480px) {
   .topbar { padding: 16px 20px; flex-wrap: wrap; gap: 18px; }
   .brand { font-size: 19px; }
