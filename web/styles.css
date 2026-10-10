@@ -81,7 +81,7 @@ input::placeholder { color: #647386; }
 .empty-note span { display: inline-grid; place-items: center; flex-shrink: 0; border: 1px solid #8090A4; border-radius: 50%; width: 17px; height: 17px; font-size: 11px; margin-top: 2px; }
 .banner { text-align: center; background: white; padding: 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; }
 .status:empty { display: none; }
-.status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; padding: 16px 20px; background: white; border: 1px solid var(--line); border-radius: 5px; font-size: 13px; line-height: 1.6; }
+.status { overflow-wrap: anywhere; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; padding: 16px 20px; background: white; border: 1px solid var(--line); border-radius: 5px; font-size: 13px; line-height: 1.6; }
 .status p { flex: 1; margin: 0; min-width: 220px; }
 .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #CFD7E1; border-top-color: var(--ink); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -151,7 +151,8 @@ input::placeholder { color: #647386; }
 #practice-mock { font-size: 12px; color: var(--muted); }
 .flip-controls { background: var(--ink); color: white; padding: 26px 32px; border-radius: 7px; margin-top: 32px; display: flex; align-items: center; gap: 24px; justify-content: space-between; flex-wrap: wrap; }
 .control-caption { color: #C4CEDB; font-size: 12px; margin: 0 0 16px; }
-.mode-labels { display: flex; align-items: center; gap: 16px; }
+.mode-labels { display: flex; align-items: center; gap: 16px; cursor: pointer; }
+.flip-controls :focus-visible { outline-color: white; }
 .mode-labels > span:not(.mode-track) { font-size: 18px; font-weight: 500; color: #BAC6D5; }
 .mode-labels .active { color: white !important; }
 .mode-track { width: 48px; height: 26px; border: 1px solid #8B9BB1; border-radius: 20px; display: flex; align-items: center; padding: 4px; }

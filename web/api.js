@@ -36,7 +36,8 @@ async function fixture(name) {
 }
 
 export function normalizeHost(value) {
-  return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0].toLowerCase();
+  return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0]
+    .replace(/^.*@/, '').replace(/:\d+$/, '').toLowerCase();
 }
 
 export async function scan(host, data = 'health_records', years = 30) {

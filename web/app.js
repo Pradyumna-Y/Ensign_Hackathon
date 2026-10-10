@@ -42,7 +42,7 @@ async function offerSaved() {
       });
       target.querySelector('.saved div').append(button);
     }
-  } catch { target.textContent = 'Saved results could not be loaded. Check the backend connection and try again.'; }
+  } catch { target.replaceChildren(); }   // the scanner message above already explains
 }
 
 async function runScan() {
@@ -101,5 +101,10 @@ function route() {
     else a.removeAttribute('aria-current');
   });
 }
+// Skipping to the content must not change the page the visitor is on.
+document.querySelector('.skip').addEventListener('click', event => {
+  event.preventDefault();
+  $('#main').focus();
+});
 window.addEventListener('hashchange', route);
 route(); loadExamples();

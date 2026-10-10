@@ -11,10 +11,10 @@ export function timelineView(result) {
   const overlap = s.secretUntilYear > s.quantumArrivalYear && !hybrid;
   const color = hybrid ? '#12805C' : s.urgency === 'medium' ? '#9A6700' : s.urgency === 'high' ? '#C23B32' : '#0F1B2D';
   const text = hybrid
-    ? `This data must stay secret until ${s.secretUntilYear}. The hybrid key exchange protects recorded traffic against future quantum attacks.`
+    ? `This data must stay secret until ${s.secretUntilYear}. Connections that use the hybrid key exchange are protected against recorded-traffic attacks.`
     : overlap
       ? `This data must stay secret until ${s.secretUntilYear}. Recorded traffic today could be read from ${s.quantumArrivalYear}.`
-      : `This data must stay secret until ${s.secretUntilYear}, before the assumed quantum arrival in ${s.quantumArrivalYear}. This connection still uses ${result.handshake.keyExchange === 'unknown' ? 'an unidentified' : 'an old'} key method.`;
+      : `This data must stay secret until ${s.secretUntilYear}, no later than the assumed quantum arrival in ${s.quantumArrivalYear}. This connection still uses ${result.handshake.keyExchange === 'unknown' ? 'an unidentified' : 'an old'} key method.`;
   // Labels stay in HTML so they remain readable at 390 px and under zoom.
   return `<section class="timeline" aria-label="Data shelf life"><h3>How long does the secret need to last?</h3>
     <div class="timeline-legend"><span><i style="background:${color}"></i>Data must stay secret${hybrid ? ' · protected' : ''}</span><span><i style="background:#5B4BDB"></i>Quantum computers arrive (our assumption): ${escape(s.quantumArrivalYear)}</span></div>

@@ -64,14 +64,19 @@ export function practiceView(renderResult) {
       status.innerHTML = loading();
       current = await api.scan('practice');
       show(before, current, true);
+      if (matchMedia('(max-width: 760px)').matches) {
+        root.querySelector('#after-result').scrollIntoView({block: 'start'});
+      }
       status.textContent = `Before: ${label(before)}, ${before.verdict.score}. After: ${label(current)}, ${current.verdict.score}.`;
     } catch (error) {
       // A restart may have succeeded even if its response was lost. Reload the
       // actual mode on retry rather than guessing from the previous switch.
+      comparison.replaceChildren();   // never leave an old result beside an error
       recover(error, load);
       initialized = false;
-    } finally { busy = false; button.disabled = !initialized; }
+    } finally { busy = false; button.disabled = !initialized; if (initialized) button.focus(); }
   }
   button.addEventListener('click', flip);
+  root.querySelector('.mode-labels').addEventListener('click', flip);
   return {load, isInitialized: () => initialized || busy};
 }

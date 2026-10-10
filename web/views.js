@@ -18,11 +18,11 @@ export function verdictView(result) {
     <div class="meter-label"><span>Connection readiness</span><span>Ready at 80</span></div>
     <div class="meter" role="meter" aria-label="Connection readiness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(v.score)}" style="--score:${Number(v.score)}%"><div class="meter-fill"></div><span class="threshold" aria-hidden="true"></span></div>
     <p class="meter-caption">Score checks key exchange and TLS only</p>
-    <div class="handshake"><div><p>Your browser offered</p><div class="protocols">${h.weOffered.map(g => chip(g)).join('')}</div></div><span aria-hidden="true">→</span><div><p>The site picked</p><div class="protocols">${h.serverPicked ? chip(h.serverPicked, true) : `<span class="protocol picked">No named group<small>${h.keyExchange === 'static_rsa' ? 'old method: RSA key exchange' : 'method not identified'}</small></span>`}</div></div></div>
+    <div class="handshake"><div><p>Our scanner offered</p><div class="protocols">${h.weOffered.map(g => chip(g)).join('')}</div></div><span aria-hidden="true">→</span><div><p>The site picked</p><div class="protocols">${h.serverPicked ? chip(h.serverPicked, true) : `<span class="protocol picked">No named group<small>${h.keyExchange === 'static_rsa' ? 'old method: RSA key exchange' : 'method not identified'}</small></span>`}</div></div></div>
     <p class="tls"><code>${escape(h.tlsVersion)}</code> · ${h.acceptsTls12 ? 'TLS 1.2 also accepted' : 'TLS 1.2 not accepted'}</p>
     <div class="timeline-slot"></div>
     ${v.fixes.length ? `<section class="fixes"><h3>What to change</h3><ul>${v.fixes.map(f => `<li><strong>${escape(f.title)}</strong><p>${escape(f.detail)}</p></li>`).join('')}</ul></section>` : ''}
-    <details class="notes"><summary>Notes: what this does not tell you</summary><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p><p>Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p><p>We cannot see databases, passwords, or anything behind the connection.</p><h3>Certificate (not scored)</h3>${c ? `<dl><dt>Key</dt><dd><code>${escape(c.keyType)} ${escape(c.keyBits)}</code></dd><dt>Signature</dt><dd><code>${escape(c.signature)}</code></dd><dt>Expires</dt><dd>${escape(c.expires)}</dd></dl>` : '<p>No certificate details returned.</p>'}<p>Certificates are shown for context but not scored. They matter for impersonation later, not for recorded traffic.</p><p>The year quantum computers arrive is an assumption. We use ${escape(result.shelfLife.quantumArrivalYear)} and say so on screen. Estimates vary.</p></details>
+    <details class="notes"><summary>Notes: what this does not tell you</summary><p>We check one thing: how the connection agrees on its secret key, plus the TLS version.</p><p>Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.</p><p>We cannot see databases, passwords, or anything behind the connection.</p><h3>Certificate (not scored)</h3>${c ? `<dl><dt>Key</dt><dd><code>${escape(c.keyType)} ${escape(c.keyBits)}</code></dd><dt>Signature</dt><dd><code>${escape(c.signature)}</code></dd><dt>Expires</dt><dd>${escape(c.expires)}</dd></dl>` : '<p>No certificate details returned.</p>'}<p>Certificate signatures are not scored. With an ephemeral key exchange, a stolen certificate key alone cannot decrypt past traffic. Static RSA key exchange is the exception. The scan does not verify certificate identity.</p><p>The year quantum computers arrive is an assumption. We use ${escape(result.shelfLife.quantumArrivalYear)} and say so on screen. Estimates vary.</p></details>
   </article>`;
 }
 
@@ -35,11 +35,11 @@ const errors = {
   no_tls: 'The site did not answer with a TLS connection. Check the address or try another site.',
   rate_limited: 'Too many requests. Wait a few seconds, then try again.',
   internal: 'The scanner could not finish this request. Try again.',
-  unreachable: 'The scanner is not running or cannot be reached. Start the backend or choose a saved result below.'
+  unreachable: 'The scanner cannot be reached right now. Ask the team to restart it.'
 };
 export function errorView(error, practice = false) {
   const message = practice && error.code === 'unreachable'
-    ? 'The practice server cannot be reached. Start the backend and try again. You can also open Check a site to look for saved results.'
+    ? 'The practice server cannot be reached right now. Ask the team to restart it, then try again.'
     : errors[error.code] || 'This request could not be completed. Try again.';
   return `<p>${escape(message)}</p><button class="secondary" type="button" data-retry>Try again</button>`;
 }
