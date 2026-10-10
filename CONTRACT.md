@@ -16,7 +16,7 @@ The headline demo, "Flip the Lock": a practice server we control. The judge swit
 - Labels are "Ready" and "Not ready yet". We never say "secure", "insecure", "safe", "unsafe" or "hacked".
 - Not ready today is normal and not a sign of carelessness. Ordinary computers cannot break these connections today.
 - We cannot see databases, passwords, or anything behind the connection.
-- Certificates are shown for context but not scored. With an ephemeral key exchange, a stolen certificate key alone cannot decrypt recorded traffic. Static RSA key exchange is the exception. We do not verify certificate identity.
+- Certificates are shown for context but not scored. With an ephemeral key exchange, a stolen certificate key alone cannot decrypt recorded traffic. Static RSA key exchange is the exception. We also show whether the certificate matches the name and chains to a trusted authority, for context only; it never changes the score.
 - "Ready" means our scanner negotiated a hybrid group on this one connection. Other clients, older TLS versions and other servers behind the same name may differ.
 - The year quantum computers arrive is an assumption. We use 2040 and say so on screen. Estimates vary.
 - Live results are labeled "Live scan". Saved results are labeled "Saved result from <time>". Never present a saved result as live.
@@ -81,13 +81,15 @@ Returns a ScanResult:
     "keyBits": 256,
     "signature": "ecdsa-with-SHA256",
     "expires": "2027-01-04",
+    "verified": true,
+    "verifyNote": "The certificate matches this name and chains to a trusted authority.",
     "note": "Shown for context. Not scored."
   },
   "verdict": {
     "label": "ready",
     "score": 95,
-    "headline": "Recorded traffic to this site is protected against future quantum attacks.",
-    "reason": "The site agreed on its key using a hybrid post-quantum method.",
+    "headline": "Our scanner connected to this site using hybrid post-quantum key exchange.",
+    "reason": "The site picked X25519MLKEM768, a hybrid post-quantum method. Other clients and older TLS versions may differ.",
     "harvestWindowOpen": false,
     "fixes": [
       {

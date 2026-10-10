@@ -196,8 +196,17 @@ async def demo_sites():
 
 @app.get("/api/practice")
 async def practice_status(request: Request):
-    # "mode" is null while the practice server is not running.
-    return {"mode": request.app.state.practice.mode, "scanHost": "practice"}
+    # "mode" is null while the practice server is not running. Wait briefly for
+    # a restart in progress, so a reader does not see the gap between modes.
+    practice = request.app.state.practice
+    try:
+        await asyncio.wait_for(practice.lock.acquire(), 3)
+    except asyncio.TimeoutError:
+        return {"mode": practice.mode, "scanHost": "practice"}
+    try:
+        return {"mode": practice.mode, "scanHost": "practice"}
+    finally:
+        practice.lock.release()
 
 
 class ModeRequest(BaseModel):

@@ -144,3 +144,20 @@ def test_damaged_saved_values_are_ignored(monkeypatch, tmp_path):
         (tmp_path / "cloudflare.com.json").write_text(
             json.dumps({**valid_saved(), **change}), encoding="utf-8")
         assert cache.load("cloudflare.com") is None
+
+
+def test_certificate_identity_from_verify_line():
+    probe = parse_s_client(RawProbe(sample("tls13_hybrid_cloudflare")))
+    assert probe.verify == (0, "ok")
+    assert scanner.certificate_identity(probe.verify)[0] is True
+    text = sample("tls13_hybrid_cloudflare").replace(
+        "Verify return code: 0 (ok)", "Verify return code: 62 (Hostname mismatch)")
+    bad = parse_s_client(RawProbe(text))
+    verified, note = scanner.certificate_identity(bad.verify)
+    assert verified is False and "does not match" in note
+
+
+def test_identity_unknown_when_no_verify_line():
+    assert scanner.certificate_identity(None) == (None, "Identity was not checked.")
+    verified, note = scanner.certificate_identity((99, "odd"))
+    assert verified is False and "99" in note

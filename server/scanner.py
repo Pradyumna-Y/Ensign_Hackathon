@@ -106,8 +106,10 @@ async def run_s_client(openssl, ip, host, port, version_flag, groups=None):
     hostname can never be interpreted as a command.
     """
     target = f"[{ip}]:{port}" if ":" in ip else f"{ip}:{port}"
+    # -verify_hostname only records whether the certificate fits the name (it
+    # does not stop the handshake), so the result can show an identity check.
     args = [openssl, "s_client", "-connect", target, "-servername", host,
-            version_flag, "-showcerts"]
+            "-verify_hostname", host, version_flag, "-showcerts"]
     if groups:
         args += ["-groups", ":".join(groups)]
 
@@ -147,6 +149,7 @@ class Probe:
     group: str | None         # key exchange group the server picked, e.g. "X25519MLKEM768"
     cert_pem: str | None      # the server's own (leaf) certificate
     failure: str | None       # why it failed: timeout, connect_failed, not_tls, handshake_refused
+    verify: tuple | None = None   # (OpenSSL verify code, text) for the certificate, if printed
 
 
 NEW_LINE = re.compile(r"^New, (\S+), Cipher is (\S+)", re.M)
@@ -156,6 +159,7 @@ NEW_LINE = re.compile(r"^New, (\S+), Cipher is (\S+)", re.M)
 PROTOCOL = re.compile(r"^Protocol\s*:\s*(\S+)", re.M)
 NEGOTIATED = re.compile(r"^Negotiated TLS1\.3 group: (\S+)", re.M)
 TEMP_KEY = re.compile(r"^(?:Peer|Server) Temp Key: (.+)$", re.M)
+VERIFY = re.compile(r"^\s*Verify return code: (-?\d+) \((.*)\)\s*$", re.M)
 PEM_BLOCK = re.compile(
     r"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", re.S)
 
@@ -212,8 +216,10 @@ def parse_s_client(raw):
             failure = "not_tls"   # something answered, but it does not speak TLS
         else:
             failure = "handshake_refused"
+    verify = VERIFY.search(text) if ok else None
     return Probe(ok, protocol, cipher, group if ok else None,
-                 pem[0] if (ok and pem) else None, failure)
+                 pem[0] if (ok and pem) else None, failure,
+                 (int(verify[1]), verify[2]) if verify else None)
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +261,27 @@ def classify(tls13, tls12):
 # Certificate (shown for context, never scored)
 # ---------------------------------------------------------------------------
 
+# Plain-English notes for the most common OpenSSL verify results.
+VERIFY_NOTES = {
+    0: "The certificate matches this name and chains to a trusted authority.",
+    10: "The certificate has expired.",
+    18: "The certificate is self-signed.",
+    19: "The certificate chain ends in an untrusted root.",
+    20: "We could not build a chain to a trusted authority.",
+    21: "We could not build a chain to a trusted authority.",
+    62: "The certificate does not match this name.",
+}
+
+
+def certificate_identity(verify):
+    """(verified, note) from a probe's verify result. verified is None if unknown."""
+    if verify is None:
+        return None, "Identity was not checked."
+    code, _text = verify
+    return code == 0, VERIFY_NOTES.get(
+        code, f"The certificate could not be confirmed (OpenSSL code {code}).")
+
+
 def parse_certificate(pem):
     if not pem:
         return None
@@ -292,6 +319,12 @@ RETRY_FAILURES = ("timeout", "connect_failed", "handshake_refused")
 
 async def _nothing():
     return None
+
+
+def _with_identity(cert, verify):
+    if cert is not None:
+        cert["verified"], cert["verifyNote"] = certificate_identity(verify)
+    return cert
 
 
 async def probe_site(openssl, host, ip, port=443):
@@ -340,7 +373,7 @@ async def probe_site(openssl, host, ip, port=443):
             "supportsTls13": tls13.ok,
             "acceptsTls12": tls12.ok,
         },
-        "certificate": parse_certificate(main.cert_pem),
+        "certificate": _with_identity(parse_certificate(main.cert_pem), main.verify),
     }
 
 

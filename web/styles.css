@@ -153,6 +153,7 @@ input::placeholder { color: #647386; }
 .control-caption { color: #C4CEDB; font-size: 12px; margin: 0 0 16px; }
 .mode-labels { display: flex; align-items: center; gap: 16px; cursor: pointer; }
 .flip-controls :focus-visible { outline-color: white; }
+@media (max-width: 760px) { .timeline svg text { font-size: 25px; } }
 .mode-labels > span:not(.mode-track) { font-size: 18px; font-weight: 500; color: #BAC6D5; }
 .mode-labels .active { color: white !important; }
 .mode-track { width: 48px; height: 26px; border: 1px solid #8B9BB1; border-radius: 20px; display: flex; align-items: center; padding: 4px; }

@@ -27,8 +27,9 @@ Built for Ensign BUILD, Technical Solution category.
 - We cannot see databases, passwords, or anything behind the connection.
 - Certificates are shown for context but not scored. With an ephemeral key
   exchange, a stolen certificate key alone cannot decrypt traffic recorded
-  today. Static RSA key exchange is the exception. We do not verify the
-  certificate's identity, so a result describes the server our scanner reached.
+  today. Static RSA key exchange is the exception. We also show whether the
+  certificate matches the name and chains to a trusted authority, for context
+  only; it never changes the score.
 - "Ready" means our scanner negotiated a hybrid group on this one connection.
   Other clients, older TLS versions, and other servers behind the same name
   may behave differently. A bare domain and its `www` name can differ.

@@ -5,7 +5,7 @@
 FROM python:3.12-slim-trixie
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 # Fail the build early if this OpenSSL cannot offer the hybrid group.
